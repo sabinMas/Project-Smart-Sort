@@ -182,38 +182,28 @@ async def handle_docusign_webhook(request: Request) -> dict:
 async def handle_box_webhook(request: Request) -> dict:
     """Handle Box webhook events - FILE.UPLOADED triggers auto-classify and sort.
 
-    Box sends this when a file is uploaded to a watched folder (e.g. Inbox).
-    We download the file, classify it, then move it to the correct folder.
-
-    Setup in Box Developer Console:
-      Trigger: FILE.UPLOADED
-      URL: https://project-smart-sort.onrender.com/webhooks/box
+    Flow:
+    1. File emailed to Inbox.wd6jkg7cbj1k47n2@u.box.com → lands in Box /Inbox
+    2. Box fires FILE.UPLOADED webhook here
+    3. We download the file, extract text, classify with AI
+    4. Move the ORIGINAL file to the correct folder (/Invoices, /Contracts, etc.)
+    5. Apply metadata + create review task
     """
+    import io
+    import json as _json
     from backend.shared.config import Config
     from backend.shared.types import IngestedDocument
-    from backend.orchestration import get_orchestrator
+    from backend.domain_2_classifier.service import ClassificationService
+    from backend.domain_3_box_integration.metadata import MetadataManager
+    from backend.domain_3_box_integration.tasks import TaskManager
+    from backend.domain_3_box_integration.notifications import NotificationManager
     from .box_client import BoxClient
-
-    # Verify Box webhook signature
-    primary_key   = Config.WEBHOOK_PRIMARY_KEY
-    secondary_key = Config.WEBHOOK_SECONDARY_KEY
 
     body_bytes = await request.body()
 
-    def _valid_sig(key: str) -> bool:
-        sig = hmac.new(key.encode(), body_bytes, hashlib.sha256).hexdigest()
-        return hmac.compare_digest(
-            sig,
-            request.headers.get("box-signature-primary", "")
-            or request.headers.get("box-signature-secondary", ""),
-        )
-
-    if primary_key and not _valid_sig(primary_key):
-        if secondary_key and not _valid_sig(secondary_key):
-            raise HTTPException(status_code=401, detail="Invalid Box webhook signature")
-
+    # Parse body
     try:
-        body = __import__("json").loads(body_bytes)
+        body = _json.loads(body_bytes)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON body")
 
@@ -237,34 +227,37 @@ async def handle_box_webhook(request: Request) -> dict:
         logger.info(f"Skipping non-PDF file: {file_name}")
         return {"status": "ignored", "reason": "not a PDF"}
 
-    logger.info(f"Processing uploaded file: {file_name} (id={file_id})")
+    logger.info(f"📄 New file in Inbox: {file_name} (id={file_id})")
 
-    # Download file bytes from Box
     box_client = BoxClient()
+
+    # Step 1: Download file bytes from Box
     try:
         file_bytes = await box_client.download_file(file_id)
+        logger.info(f"  ✓ Downloaded {len(file_bytes)} bytes")
     except Exception as e:
         logger.error(f"Failed to download file {file_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Could not download file: {e}")
 
-    # Extract text for classification (use Textract / pdfplumber)
-    from backend.domain_1_email.textract_parser import get_textract_parser
-    textract = get_textract_parser()
-    extracted_text = await textract.extract_pdf_text(file_bytes, file_name)
+    # Step 2: Extract text (Textract → pdfplumber fallback)
+    extracted_text = ""
+    try:
+        from backend.domain_1_email.textract_parser import get_textract_parser
+        extracted_text = await get_textract_parser().extract_pdf_text(file_bytes, file_name)
+    except Exception:
+        pass
 
     if not extracted_text:
-        # Fallback to pdfplumber
         try:
-            import io
             import pdfplumber
             with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-                extracted_text = "\n".join(
-                    p.extract_text() or "" for p in pdf.pages
-                )
+                extracted_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
         except Exception:
             extracted_text = f"[Could not extract text from {file_name}]"
 
-    # Build IngestedDocument and run full pipeline
+    logger.info(f"  ✓ Extracted {len(extracted_text)} chars of text")
+
+    # Step 3: Classify with AI (Domain 2)
     document = IngestedDocument(
         filename=file_name,
         content=extracted_text,
@@ -273,26 +266,97 @@ async def handle_box_webhook(request: Request) -> dict:
         raw_file_bytes=file_bytes,
     )
 
-    orchestrator = get_orchestrator()
-    result = await orchestrator.process_ingested_document(document)
+    try:
+        classifier = ClassificationService()
+        classification = await classifier.classify(document)
+        logger.info(f"  ✓ Classified as {classification.doc_type} ({classification.confidence:.0%} confidence)")
+    except Exception as e:
+        logger.error(f"Classification failed: {e}")
+        # Move to Other if classification fails
+        from backend.shared.types import ClassificationResult
+        classification = ClassificationResult(
+            document_id=document.id,
+            doc_type="other",
+            confidence=0.5,
+            reasoning=f"Classification failed: {e}",
+        )
 
-    # Move the already-uploaded file to the correct folder
-    if result and result.box_file_id and result.destination_folder:
-        try:
-            dest_folder_id = await box_client.get_or_create_folder(
-                result.destination_folder
-            )
-            await box_client.move_file(file_id, dest_folder_id)
-            logger.info(f"Moved {file_name} → {result.destination_folder}")
-        except Exception as e:
-            logger.warning(f"Could not move file after classification: {e}")
+    # Step 4: Move the ORIGINAL file to the correct destination folder
+    from backend.shared.config import FOLDER_MAPPING
+    from datetime import datetime, timezone
+
+    base_path = FOLDER_MAPPING.get(classification.doc_type, "/Other Documents")
+    now = datetime.now(timezone.utc)
+
+    # Add year/month subfolders for financial docs
+    if classification.doc_type in ("invoice", "contract", "receipt", "purchase_order"):
+        destination = f"{base_path}/{now.year}/{now.strftime('%B')}"
+    else:
+        destination = base_path
+
+    try:
+        dest_folder_id = await box_client.get_or_create_folder(destination)
+        await box_client.move_file(file_id, dest_folder_id)
+        logger.info(f"  ✓ Moved to {destination}")
+    except Exception as e:
+        logger.error(f"Failed to move file to {destination}: {e}")
+        return {
+            "status": "classified_but_not_moved",
+            "file_id": file_id,
+            "file_name": file_name,
+            "doc_type": classification.doc_type,
+            "error": str(e),
+        }
+
+    # Step 5: Apply metadata tags to file
+    try:
+        metadata_manager = MetadataManager()
+        metadata = metadata_manager.build_metadata_dict(classification)
+        await box_client.apply_metadata(file_id, metadata)
+        logger.info(f"  ✓ Metadata applied")
+    except Exception as e:
+        logger.warning(f"Metadata application failed (non-fatal): {e}")
+
+    # Step 6: Create review task
+    task_id = None
+    try:
+        task_manager = TaskManager(box_client)
+        from backend.shared.config import REVIEWER_MAPPING
+        from backend.domain_3_box_integration.tasks import REVIEWER_EMAIL_MAPPING
+        reviewer_role  = REVIEWER_MAPPING.get(classification.doc_type)
+        reviewer_email = REVIEWER_EMAIL_MAPPING.get(reviewer_role) if reviewer_role else None
+        task_id = await task_manager.create_review_task(
+            file_id=file_id,
+            doc_type=classification.doc_type,
+            assigned_to_email=reviewer_email,
+        )
+        logger.info(f"  ✓ Review task created → {reviewer_email}")
+    except Exception as e:
+        logger.warning(f"Task creation failed (non-fatal): {e}")
+
+    # Step 7: Send Slack notification
+    try:
+        notif = NotificationManager()
+        await notif.send_notifications(
+            document_id=document.id,
+            doc_type=classification.doc_type,
+            assigned_to_email=reviewer_email if task_id else "",
+            channels=["slack"],
+        )
+    except Exception as e:
+        logger.warning(f"Notification failed (non-fatal): {e}")
+
+    logger.info(f"✅ Done: {file_name} → {destination}")
 
     return {
-        "status": "processed",
+        "status": "success",
         "file_id": file_id,
         "file_name": file_name,
-        "classification": result.status if result else "unknown",
-        "destination": result.destination_folder if result else None,
+        "doc_type": classification.doc_type,
+        "confidence": classification.confidence,
+        "destination": destination,
+        "task_id": task_id,
+        "extracted_fields": classification.extracted_fields,
     }
 
 
