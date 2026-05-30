@@ -1,6 +1,6 @@
 """Business logic for Domain 3: Box Integration."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from backend.shared.types import ClassificationResult, ProcessingResult
 from backend.shared.config import FOLDER_MAPPING, REVIEWER_MAPPING
 from backend.shared.errors import BoxIntegrationError
@@ -89,7 +89,7 @@ class BoxIntegrationService:
                 metadata_applied=metadata,
                 notification_sent_to=notified,
                 error_message=None,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
             )
 
             logger.info(
@@ -113,7 +113,7 @@ class BoxIntegrationService:
                 metadata_applied={},
                 notification_sent_to=[],
                 error_message=str(e),
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
             )
 
     def _get_destination_path(self, doc_type: str) -> str:
@@ -129,7 +129,7 @@ class BoxIntegrationService:
             str: Folder path
         """
         base_path = FOLDER_MAPPING.get(doc_type, "/Other Documents")
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Add year/month subfolders for invoices, contracts, receipts, purchase_orders
         if doc_type in ("invoice", "contract", "receipt", "purchase_order"):
