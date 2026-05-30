@@ -26,12 +26,28 @@ interface BoxContext {
 
 /**
  * Get the current Box context (file ID, auth token, etc.)
- * This is called automatically by Box when the extension is initialized
+ * Box Web Integrations pass file_id and auth_code as URL query parameters.
+ * Falls back to postMessage for iframe-based integrations.
  */
 export const getBoxContext = (): Promise<BoxContext> => {
   return new Promise((resolve, reject) => {
-    // Box SDK automatically provides context via window.postMessage
-    // The extension is initialized with context in a parent frame message
+    // Primary: read from URL query params (Box Web Integration callback)
+    const params = new URLSearchParams(window.location.search);
+    const fileId = params.get('file_id');
+    const authCode = params.get('auth_code');
+
+    if (fileId) {
+      resolve({
+        fileId,
+        fileName: params.get('file_name') || '',
+        folderId: params.get('folder_id') || '',
+        userId: params.get('user_id') || '',
+        accessToken: authCode || '',
+      });
+      return;
+    }
+
+    // Fallback: postMessage for iframe-based integrations
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'BOX_CONTEXT') {
         window.removeEventListener('message', handleMessage);
@@ -50,7 +66,7 @@ export const getBoxContext = (): Promise<BoxContext> => {
     // Fallback timeout if no message received
     setTimeout(() => {
       window.removeEventListener('message', handleMessage);
-      reject(new Error('Box context not received within timeout'));
+      reject(new Error('Box context not received. No file_id in URL and no postMessage received.'));
     }, 5000);
 
     // Signal that we're ready to receive context

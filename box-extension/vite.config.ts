@@ -1,27 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  root: '.',
+  publicDir: 'public',
   build: {
-    lib: {
-      entry: path.resolve(__dirname, 'src/main.tsx'),
-      name: 'BoxSmartInbox',
-      formats: ['umd'],
-      fileName: () => 'box-extension.js'
-    },
-    rollupOptions: {
-      external: [],
-      output: {
-        globals: {
-          react: 'React',
-          'react-dom': 'ReactDOM'
-        }
-      }
-    },
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
   },
   server: {
     port: 5173,
