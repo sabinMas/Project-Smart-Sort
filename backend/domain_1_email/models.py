@@ -1,38 +1,58 @@
-"""Pydantic models for Domain 1: Email Ingestion."""
+"""Pydantic models for Domain 1 (Email Ingestion)."""
 
+from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from datetime import datetime
 
 
-class EmailAttachment(BaseModel):
-    """Represents an attachment in an email."""
+class AttachmentModel(BaseModel):
+    """Email attachment model."""
 
-    filename: str = Field(..., description="Name of the attachment file")
-    content_type: str = Field(..., description="MIME type (e.g., application/pdf)")
-    size_bytes: int = Field(..., description="File size in bytes")
-    content: Optional[bytes] = Field(None, description="File content (base64 encoded)")
+    filename: str
+    content_type: str
+    content: str  # base64 encoded
 
 
-class EmailPayload(BaseModel):
-    """Represents the raw email payload from SendGrid webhook."""
+class SendGridInboundWebhookModel(BaseModel):
+    """SendGrid inbound parse webhook payload."""
 
-    headers: dict = Field(default_factory=dict, description="Email headers")
-    from_email: str = Field(..., description="Sender email address", alias="from")
-    to: str = Field(..., description="Recipient email address")
-    subject: str = Field(..., description="Email subject line")
-    text: Optional[str] = Field(None, description="Plain text body")
-    html: Optional[str] = Field(None, description="HTML body")
-    attachments: List[EmailAttachment] = Field(default_factory=list, description="Email attachments")
+    from_: str = Field(alias="from")
+    to: str
+    subject: str
+    text: Optional[str] = None
+    html: Optional[str] = None
+    attachments: Optional[int] = None
+    attachment: Optional[List[AttachmentModel]] = None
 
     class Config:
-        """Pydantic config."""
-
         populate_by_name = True
 
 
-class WebhookResponse(BaseModel):
-    """Response from webhook endpoint."""
+class EmailReturnWebhookModel(BaseModel):
+    """Webhook for signed document returns via email."""
 
-    status: str = Field(..., description="Status: success or error")
-    document_id: Optional[str] = Field(None, description="ID of ingested document")
-    message: str = Field(..., description="Response message")
+    from_: str = Field(alias="from")
+    subject: str
+    document_id: Optional[str] = None
+    attachment_filename: str
+    attachment_content: str  # base64 encoded
+
+
+class DocumentUploadRequest(BaseModel):
+    """Request to upload a document (manual upload, not via email)."""
+
+    file_data: str  # base64 encoded
+    file_name: str
+    source: str = "manual_upload"
+    source_email: Optional[EmailStr] = None
+
+
+class DocumentIngestionResponse(BaseModel):
+    """Response after ingesting a document."""
+
+    document_id: str
+    filename: str
+    status: str
+    box_file_id: Optional[str] = None
+    classified_at: Optional[datetime] = None
+    error: Optional[str] = None

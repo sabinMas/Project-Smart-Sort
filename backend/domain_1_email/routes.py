@@ -1,52 +1,98 @@
-"""FastAPI routes for Domain 1: Email Ingestion."""
+"""FastAPI routes for Domain 1 (Email Ingestion)."""
 
+import logging
 from fastapi import APIRouter, Request, HTTPException
-from backend.domain_1_email.models import WebhookResponse
-from backend.domain_1_email.service import EmailIngestionService
-from backend.shared.logging import get_logger
+from .models import (
+    DocumentUploadRequest,
+    DocumentIngestionResponse
+)
 
-logger = get_logger(__name__)
-router = APIRouter(prefix="/webhooks", tags=["email"])
-
-email_service = EmailIngestionService()
+logger = logging.getLogger(__name__)
+router = APIRouter()
 
 
-@router.post("/email", response_model=WebhookResponse)
-async def handle_email_webhook(request: Request) -> WebhookResponse:
+@router.post("/webhooks/sendgrid", tags=["email"])
+async def handle_sendgrid_webhook(request: Request) -> dict:
     """
-    Handle incoming email webhook from SendGrid or Postmark.
-
-    TODO: Implement webhook handler:
-    1. Validate webhook signature (use email_service.validate_sendgrid_signature)
-    2. Parse email payload (from/to/subject/attachments)
-    3. Call email_service.ingest_email() to process
-    4. On success: Return {"status": "success", "document_id": "..."}
-    5. On error: Log error and return 400 with error message
-
-    The webhook will be called by SendGrid with multipart/form-data:
-    - headers: Email headers
-    - from: Sender email
-    - to: Recipient email
-    - subject: Subject line
-    - text: Plain text body
-    - html: HTML body
-    - attachment files (multiple)
-
+    Handle incoming emails from SendGrid webhook.
+    
+    Expects:
+    - Verified SendGrid webhook signature
+    - Email with PDF/document attachments
+    
     Returns:
-        WebhookResponse: Status and document ID
-
-    Raises:
-        HTTPException: If signature validation fails or processing errors occur
+    - 200 OK: Webhook received and queued for processing
+    - 401 Unauthorized: Invalid signature
+    - 400 Bad Request: Missing required fields
     """
-    raise NotImplementedError("TODO: Implement SendGrid webhook handler")
+    # TODO: Implement full SendGrid webhook handler
+    # Phase 2 deliverable:
+    # 1. Validate SendGrid webhook signature
+    # 2. Extract email metadata (from, to, subject)
+    # 3. Extract attachments from email
+    # 4. Compute file hash for deduplication
+    # 5. Upload to Box inbox folder
+    # 6. Insert into contact_emails table
+    # 7. Insert into email_audit_log
+    # 8. Trigger Domain 2 classification (via HTTP API)
+    return {"status": "received", "message": "TODO: Implement SendGrid webhook handler"}
 
 
-@router.get("/health")
-async def health_check() -> dict:
+@router.post("/webhooks/email-return", tags=["email"])
+async def handle_email_return(request: Request) -> dict:
     """
-    Health check endpoint for Domain 1.
-
+    Handle signed documents returning via email.
+    
+    Called when a signed PDF comes back from recipient's email.
+    Matches it to the original document and updates signature state.
+    
     Returns:
-        dict: Status information
+    - 200 OK: Return received and processed
+    - 400 Bad Request: Could not match to document
     """
-    return {"status": "ok", "service": "email-ingestion"}
+    # TODO: Implement email return handler
+    # Phase 5 deliverable:
+    # 1. Extract attachment (signed PDF)
+    # 2. Try to match to original document (filename, hash, metadata)
+    # 3. Upload signed version to Box pending_return folder
+    # 4. Extract signatures via OCR
+    # 5. Update signature_state table with signed recipients
+    # 6. Call Domain 3 to check completion
+    return {"status": "received", "message": "TODO: Implement email return handler"}
+
+
+@router.post("/api/documents/upload", response_model=DocumentIngestionResponse, tags=["documents"])
+async def upload_document(request: DocumentUploadRequest) -> DocumentIngestionResponse:
+    """
+    Manually upload a document for processing.
+    
+    Alternative to email ingestion for testing and UI uploads.
+    
+    Args:
+        request: DocumentUploadRequest with base64-encoded file
+    
+    Returns:
+        DocumentIngestionResponse with document ID and status
+    """
+    # TODO: Implement manual upload
+    # Phase 2 deliverable:
+    # 1. Decode base64 file data
+    # 2. Validate file (PDF, size, etc.)
+    # 3. Compute file hash
+    # 4. Upload to Box inbox
+    # 5. Create documents table entry
+    # 6. Trigger Domain 2 classification
+    raise NotImplementedError("TODO: Implement manual document upload")
+
+
+@router.get("/api/documents/pending-return", tags=["documents"])
+async def list_pending_return_documents() -> dict:
+    """
+    List documents waiting for signed copies to be returned.
+    
+    Returns:
+        dict with list of documents in "pending_return" status
+    """
+    # TODO: Implement pending return list
+    # Phase 5 deliverable
+    return {"documents": [], "message": "TODO: Implement pending return list"}
