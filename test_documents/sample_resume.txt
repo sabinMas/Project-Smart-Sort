@@ -1,0 +1,92 @@
+================================================================================
+                          ALEX CHEN
+================================================================================
+
+San Francisco, CA 94103 | (415) 555-0199 | alex.chen@email.com | linkedin.com/in/alexchen
+
+================================================================================
+PROFESSIONAL SUMMARY
+================================================================================
+
+Experienced Software Engineer with 7+ years in full-stack development, cloud
+infrastructure, and team leadership. Proven track record of delivering high-
+impact solutions in fast-paced startup environments. Expertise in Python,
+JavaScript, AWS, and system design. Passionate about building scalable systems
+and mentoring junior engineers.
+
+================================================================================
+PROFESSIONAL EXPERIENCE
+================================================================================
+
+SENIOR SOFTWARE ENGINEER | Tech Startup Inc. | San Francisco, CA
+June 2021 - Present
+
+• Led development of real-time data pipeline processing 2M+ events/day
+• Designed and implemented microservices architecture using Python and FastAPI
+• Reduced API response times by 60% through caching and query optimization
+• Mentored 3 junior engineers on best practices and code quality
+• Implemented automated testing bringing coverage from 45% to 92%
+• Technologies: Python, FastAPI, PostgreSQL, Redis, AWS, Docker, Kubernetes
+
+SOFTWARE ENGINEER | Mobile App Company | San Francisco, CA
+March 2018 - May 2021
+
+• Developed iOS and Android applications using React Native (50K+ downloads)
+• Implemented OAuth 2.0 authentication and payment integration
+• Managed $500K AWS infrastructure and reduced costs by 35%
+• Wrote comprehensive technical documentation and API specifications
+• Lead code reviews and enforced coding standards across 8-person team
+• Technologies: JavaScript, React Native, Node.js, Firebase, AWS
+
+JUNIOR DEVELOPER | Digital Agency | San Francisco, CA
+July 2016 - February 2018
+
+• Built responsive web applications using React and Vue.js
+• Collaborated with designers to implement pixel-perfect UI components
+• Debugged and fixed critical production issues within SLAs
+• Participated in agile sprints and sprint retrospectives
+• Technologies: JavaScript, React, Vue.js, HTML/CSS, MySQL
+
+================================================================================
+EDUCATION
+================================================================================
+
+BACHELOR OF SCIENCE IN COMPUTER SCIENCE
+University of California, Berkeley | Graduated: May 2016
+GPA: 3.7/4.0
+Relevant Coursework: Data Structures, Algorithms, Database Systems, Networks
+
+================================================================================
+SKILLS
+================================================================================
+
+Languages: Python, JavaScript, TypeScript, Java, SQL, HTML/CSS, Go
+Frameworks: FastAPI, React, Vue.js, Node.js, Django, Flask
+Databases: PostgreSQL, MySQL, Redis, MongoDB, DynamoDB
+Cloud: AWS (EC2, S3, Lambda, RDS, CloudFront), Google Cloud, Docker
+Tools: Git, GitHub, JIRA, Datadog, Jenkins, Kubernetes, Terraform
+Methodologies: Agile, Scrum, Test-Driven Development, Microservices
+
+================================================================================
+CERTIFICATIONS & ACHIEVEMENTS
+================================================================================
+
+• AWS Certified Solutions Architect - Professional (2023)
+• Speaker at PyCon 2023: "Building Real-time Systems with FastAPI"
+• Open Source Contributor: 200+ commits to popular Python libraries
+• Patent Holder: Real-time data processing optimization technique
+
+================================================================================
+PERSONAL
+================================================================================
+
+Languages: Fluent in English and Mandarin Chinese
+Interests: Open source development, machine learning, rock climbing, travel
+
+================================================================================
+REFERENCES
+================================================================================
+
+Available upon request.
+
+================================================================================

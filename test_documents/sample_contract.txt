@@ -1,0 +1,106 @@
+================================================================================
+                        SERVICE AGREEMENT
+================================================================================
+
+THIS AGREEMENT ("Agreement") is entered into effective as of May 29, 2024
+("Effective Date"), by and between:
+
+ACME CORPORATION, a Delaware corporation ("Provider")
+AND
+SMART INBOX SYSTEMS, INC., a California corporation ("Client")
+
+================================================================================
+1. SERVICES
+================================================================================
+
+Provider agrees to provide the following services ("Services"):
+
+1.1 Software-as-a-Service (SaaS) platform for document classification
+    and automation
+1.2 24/7 technical support and maintenance
+1.3 Monthly reporting and analytics
+1.4 Regular security updates and patches
+1.5 Quarterly business reviews
+
+Services shall commence on June 15, 2024 ("Service Commencement Date").
+
+================================================================================
+2. TERM
+================================================================================
+
+2.1 Initial Term: One (1) year from the Effective Date
+2.2 Renewal: Automatic renewal for successive one-year terms unless either
+    party provides written notice of non-renewal at least 60 days prior
+    to expiration.
+
+================================================================================
+3. COMPENSATION
+================================================================================
+
+3.1 Client shall pay Provider a monthly service fee of $2,500.00, due on
+    the 1st day of each calendar month.
+3.2 Annual amount: $30,000.00
+3.3 Payment method: ACH transfer or credit card
+3.4 Late payments subject to 1.5% monthly interest
+
+================================================================================
+4. CONFIDENTIALITY
+================================================================================
+
+4.1 Each party agrees to maintain the confidentiality of the other party's
+    proprietary information
+4.2 Confidential information shall not be disclosed to third parties without
+    prior written consent
+4.3 Obligation continues for 2 years after termination
+
+================================================================================
+5. LIMITATION OF LIABILITY
+================================================================================
+
+IN NO EVENT SHALL EITHER PARTY BE LIABLE FOR INDIRECT, INCIDENTAL, OR
+CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+TOTAL LIABILITY SHALL NOT EXCEED THE FEES PAID IN THE 12 MONTHS PRECEDING
+THE CLAIM.
+
+================================================================================
+6. TERMINATION
+================================================================================
+
+6.1 Either party may terminate for material breach if not cured within
+    30 days of written notice
+6.2 Client may terminate for convenience with 90 days written notice
+6.3 Upon termination, Client shall pay all outstanding fees
+
+================================================================================
+7. GENERAL PROVISIONS
+================================================================================
+
+7.1 Entire Agreement: This Agreement constitutes the entire agreement
+7.2 Amendments: May only be amended in writing signed by both parties
+7.3 Severability: If any provision is invalid, others remain in effect
+7.4 Governing Law: State of California
+
+================================================================================
+
+IN WITNESS WHEREOF, the parties have executed this Agreement as of the
+Effective Date:
+
+ACME CORPORATION
+
+By: ______________________________
+    Authorized Representative
+    Date: _____________________
+
+
+SMART INBOX SYSTEMS, INC.
+
+By: ______________________________
+    Authorized Representative
+    Date: _____________________
+
+
+================================================================================
+                            END OF AGREEMENT
+================================================================================

@@ -1,0 +1,59 @@
+================================================================================
+                              INVOICE
+================================================================================
+
+Invoice Number:    INV-2024-00127
+Invoice Date:      May 29, 2024
+Due Date:          June 28, 2024
+Payment Terms:     Net 30
+
+FROM:
+Acme Corporation
+123 Business Street
+San Francisco, CA 94105
+USA
+Phone: (415) 555-0100
+Email: billing@acme.com
+
+BILL TO:
+Smart Inbox Systems
+456 Tech Avenue
+San Francisco, CA 94103
+USA
+Contact: Robert Johnson
+
+================================================================================
+
+DESCRIPTION OF SERVICES
+================================================================================
+
+Item No. | Description                      | Quantity | Unit Price | Amount
+---------|----------------------------------|----------|------------|----------
+1        | Software License (Annual)        | 1        | $3,500.00  | $3,500.00
+2        | Implementation & Training        | 40       | $150.00    | $6,000.00
+3        | Annual Support & Maintenance     | 1        | $1,500.00  | $1,500.00
+
+                                              Subtotal: $11,000.00
+                                         Sales Tax (8.625%): $  949.75
+                                         ─────────────────────────────
+                                              TOTAL DUE: $11,949.75
+
+================================================================================
+
+PAYMENT INSTRUCTIONS:
+Please remit payment via:
+• ACH: Routing 121000248, Account 123456789
+• Wire Transfer: Contact billing@acme.com for details
+• Credit Card: Visit https://acme.com/pay
+
+Invoice Reference: INV-2024-00127
+
+Thank you for your business!
+
+For questions, contact: accounts@acme.com
+================================================================================
+                                                   Date: May 29, 2024
+                                         Authorized Signature: ____________
+
+This is an official invoice. Payment is due by the date specified above.
+Late payments may be subject to a 1.5% monthly interest charge.

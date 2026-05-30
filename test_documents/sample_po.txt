@@ -1,0 +1,125 @@
+================================================================================
+                          PURCHASE ORDER
+================================================================================
+
+PO Number:         PO-2024-08921
+PO Date:           May 29, 2024
+Delivery Date:     June 15, 2024
+Status:            OPEN
+
+PURCHASED BY:
+Smart Inbox Systems
+456 Tech Avenue
+San Francisco, CA 94103
+USA
+
+Attention: Robert Johnson
+Phone: (415) 555-0150
+Email: procurement@smartinbox.com
+
+SHIP TO:
+Smart Inbox Systems
+456 Tech Avenue
+San Francisco, CA 94103
+USA
+
+VENDOR:
+TechSupply Corp
+1000 Industry Boulevard
+San Jose, CA 95134
+USA
+Phone: (408) 555-0200
+Email: sales@techsupply.com
+Account Number: ACC-2024-1847
+
+================================================================================
+ITEMS
+================================================================================
+
+Line | SKU         | Description                  | Qty | Unit  | Unit Price | Amount
+─────|─────────────|──────────────────────────────|─────|───────|────────────|──────────
+  1  | TS-8GB-DDR4 | RAM 8GB DDR4 3200MHz          | 10  | Unit  |   $ 45.00  | $ 450.00
+  2  | TS-SSD-500  | SSD 500GB NVMe M.2           | 5   | Unit  |  $  89.99  | $ 449.95
+  3  | TS-USB-C-6  | USB-C Cable 6ft (pack of 10) | 2   | Pack  |   $ 24.50  | $  49.00
+  4  | TS-MOUNT-07 | Monitor Mount Dual Arm       | 3   | Unit  |   $ 79.99  | $ 239.97
+  5  | TS-KEYCAP-B | Keycap Set - Blue Switches   | 1   | Set   |  $ 124.99  | $ 124.99
+
+                                                   Subtotal: $ 1,313.91
+                                            Shipping (Ground): $    35.00
+                                        Tax (CA Sales Tax 8.625%): $   116.92
+                                        ───────────────────────────────────
+                                            TOTAL PO AMOUNT: $ 1,465.83
+
+================================================================================
+TERMS & CONDITIONS
+================================================================================
+
+Payment Terms:     Net 30
+Shipping Method:   Ground (FedEx or UPS)
+Freight Terms:     Prepaid and billed to PO
+Delivery Address:  As shown above
+Special Requests:  Please ship with tracking number
+Inspection:        Products subject to inspection upon receipt
+
+IMPORTANT: This PO is an official contract. Vendor must acknowledge receipt
+of this PO and confirm delivery date within 2 business days.
+
+================================================================================
+AUTHORIZED BY
+================================================================================
+
+Name: Sarah Martinez
+Title: Procurement Manager
+Department: Operations
+Company: Smart Inbox Systems
+Date: May 29, 2024
+Signature: ______________________________
+
+Approval Code: APR-20240529-8921
+Budget Code: CAPEX-2024-Q2
+
+================================================================================
+VENDOR ACKNOWLEDGMENT (To be signed and returned)
+================================================================================
+
+Vendor Name: ____________________________
+
+Authorized Representative: ____________________________
+
+Title: ____________________________
+
+Signature: ____________________________
+
+Date: ____________________________
+
+Confirmed Delivery Date: ____________________________
+
+Contact for Order Updates: ____________________________
+
+================================================================================
+INSTRUCTIONS
+================================================================================
+
+1. Vendor shall acknowledge receipt of this PO within 2 business days
+2. Notify Smart Inbox Systems of any delays or issues immediately
+3. Include packing slip with this PO number in all shipments
+4. Use tracking number on all packages
+5. Contact procurement@smartinbox.com with questions
+6. All items must meet specifications listed above
+7. Damaged items must be reported within 24 hours of receipt
+
+================================================================================
+INVOICE REQUIREMENTS
+================================================================================
+
+When invoicing this PO, include:
+• PO Number: PO-2024-08921
+• Ship Date and Tracking Number
+• Item descriptions matching PO lines
+• Invoice must match PO amount
+
+Mail invoice to: accounts@smartinbox.com
+
+================================================================================
+                            END OF PO
+================================================================================

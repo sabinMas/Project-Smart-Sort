@@ -1,0 +1,38 @@
+{
+  "name": "Box Smart Inbox",
+  "description": "AI-powered document classification and task management for Box",
+  "version": "1.0.0",
+  "author": "CascadiaJS Hackathon Team",
+  "type": "ui_element",
+  "ui_elements": [
+    {
+      "type": "sidebar",
+      "location": "file",
+      "label": "Document Classification",
+      "name": "classification_sidebar",
+      "entryPoint": "./public/index.html"
+    }
+  ],
+  "permissions": [
+    "manage:files",
+    "manage:metadata",
+    "manage:tasks"
+  ],
+  "requestedScopes": [
+    "item_upload",
+    "item_download",
+    "item_preview",
+    "item_share",
+    "annotation_view_self",
+    "annotation_edit",
+    "item_delete",
+    "task_view",
+    "task_create",
+    "task_update"
+  ],
+  "oauth2": {
+    "clientId": "utwrdq9686ub16jbtvotq2adkqubh6z0"
+  },
+  "size": "sidebar_default",
+  "refreshIntervalSeconds": 30
+}
