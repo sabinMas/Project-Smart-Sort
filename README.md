@@ -1,250 +1,261 @@
-# Box Smart Inbox
+# 📥 Box Smart Inbox
 
-An AI-powered document intake, classification, and routing system that integrates with Box.
+**AI-powered document intake, classification, and routing for [Box](https://www.box.com/).**
+Drop a PDF in a folder (or email it in) and watch it get read, understood, filed, tagged, and routed to the right reviewer — automatically.
 
-## Quick Start
-
-### Prerequisites
-- Python 3.11+
-- Docker & Docker Compose
-- API keys:
-  - SendGrid (email ingestion)
-  - Cerebras/Groq/Gemini (AI classification)
-  - Box (file management)
-
-### Setup
-
-1. **Clone and enter directory**
-   ```bash
-   git clone <repo>
-   cd hackathon-skeleton
-   ```
-
-2. **Copy environment template**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your API keys
-   ```
-
-3. **Create virtual environment (optional, Docker handles this)**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # Windows: venv\Scripts\activate
-   ```
-
-4. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-5. **Run with Docker**
-   ```bash
-   docker-compose up
-   # FastAPI available at http://localhost:8000
-   # Swagger docs at http://localhost:8000/docs
-   ```
-
-   Or run locally:
-   ```bash
-   uvicorn backend.main:app --reload
-   ```
-
-6. **Run tests**
-   ```bash
-   pytest -v                           # All tests
-   pytest domain_1_email/ -v           # Domain 1 tests
-   pytest domain_2_classifier/ -v      # Domain 2 tests
-   pytest domain_3_box_integration/ -v # Domain 3 tests
-   pytest tests/test_integration.py -v # End-to-end tests
-   ```
-
-## Architecture
-
-```
-Email/Upload
-    ↓
-[Domain 1: Email Ingestion]
-    ↓ IngestedDocument
-[Domain 2: AI Classification]
-    ↓ ClassificationResult
-[Domain 3: Box Integration]
-    ↓ ProcessingResult
-[Notifications] → Slack, Email, Dashboard
-```
-
-### Three Independent Domains
-
-1. **Domain 1: Email Ingestion** (`domain_1_email/`)
-   - Receives emails from SendGrid webhook
-   - Extracts attachments and content
-   - Returns IngestedDocument
-
-2. **Domain 2: AI Classification** (`domain_2_classifier/`)
-   - Accepts IngestedDocument
-   - Classifies with Llama 3.1 8B (Cerebras)
-   - Returns ClassificationResult with doc type and extracted fields
-
-3. **Domain 3: Box Integration** (`domain_3_box_integration/`)
-   - Accepts ClassificationResult
-   - Moves file to correct folder
-   - Applies metadata, creates review task
-   - Sends notifications
-
-## Key Endpoints
-
-```
-GET  /health                    # Health check
-POST /webhooks/email            # Email webhook (Domain 1)
-POST /documents/intake          # End-to-end processing
-GET  /status                    # Processing statistics
-GET  /documents/{document_id}   # Document status
-```
-
-## Project Structure
-
-```
-backend/
-├── domain_1_email/              # Email ingestion
-│   ├── routes.py                # FastAPI endpoints
-│   ├── service.py               # Business logic
-│   ├── models.py                # Pydantic models
-│   └── tests/                   # Unit tests
-│
-├── domain_2_classifier/         # AI classification
-│   ├── llm_router.py            # LLM provider abstraction
-│   ├── service.py               # Classification logic
-│   ├── prompts.py               # LLM prompts
-│   └── tests/
-│
-├── domain_3_box_integration/    # Box integration
-│   ├── box_client.py            # Box SDK wrapper
-│   ├── tasks.py                 # Task creation
-│   ├── metadata.py              # Metadata management
-│   ├── notifications.py         # Slack/email notifications
-│   ├── service.py               # Orchestration
-│   └── tests/
-│
-├── shared/
-│   ├── types.py                 # Shared types (LOCKED)
-│   ├── config.py                # Environment config
-│   ├── errors.py                # Custom exceptions
-│   ├── logging.py               # Logging setup
-│   └── fixtures.py              # Test fixtures
-│
-├── main.py                      # FastAPI app + orchestration
-├── tests/                       # Integration tests
-└── requirements.txt             # Dependencies
-```
-
-## Development
-
-### Rules for Team Members
-
-1. **Domain Isolation**: Each person works in their domain only
-   - Domain 1: Only edit `domain_1_email/`
-   - Domain 2: Only edit `domain_2_classifier/`
-   - Domain 3: Only edit `domain_3_box_integration/`
-
-2. **Type Contracts**: Respect shared types in `shared/types.py`
-   - IngestedDocument (output of Domain 1)
-   - ClassificationResult (output of Domain 2)
-   - ProcessingResult (output of Domain 3)
-
-3. **No Cross-Domain Imports**: Never import between domains
-   - ✅ OK: `from backend.shared.types import IngestedDocument`
-   - ❌ NO: `from backend.domain_2_classifier.service import ClassificationService`
-
-4. **Testing**: Each domain has unit tests with mocks
-   - Use fixtures in `shared/fixtures.py`
-   - Test your domain in isolation
-
-### Git Workflow
-
-```bash
-# Create domain-specific branch
-git checkout -b feature/domain-1-email
-
-# Make changes and test
-git add domain_1_email/
-git commit -m "[domain-1] Add SendGrid webhook handler"
-
-# Push and create PR
-git push origin feature/domain-1-email
-
-# Key rule: One domain per PR, no cross-domain changes
-```
-
-## Demo Checklist
-
-### Pre-Demo
-- [ ] All tests passing: `pytest -v`
-- [ ] Docs built and viewable
-- [ ] 5 sample documents prepared
-- [ ] Demo script ready
-
-### Demo Flow
-1. Send test email with invoice PDF
-2. Show document classified as "invoice" with 95%+ confidence
-3. Verify file moved to `/Invoices/2024/May` in Box
-4. Show task created and assigned to finance team
-5. Display Slack notification sent
-6. Show audit trail in logs
-
-## Troubleshooting
-
-### LLM Provider Not Responding
-```bash
-# Edit .env: Switch provider
-LLM_PROVIDER=cerebras  # Try groq if cerebras down
-# Restart server
-```
-
-### Box Authentication Fails
-```bash
-# Check Box keys in .env
-# Verify enterprise ID
-# Regenerate OAuth token if needed
-```
-
-### Merge Conflicts
-```bash
-# Most conflicts are in main.py when integrating domains
-# Just add both imports and run tests
-git add main.py
-git commit -m "Resolve merge conflict: add Domain X imports"
-pytest -v  # Verify tests pass
-```
-
-## Documentation
-
-- [Architecture](docs/ARCHITECTURE.md) - System design and data flow
-- [API Reference](docs/API_REFERENCE.md) - Endpoint documentation
-- [Crisis Runbook](docs/CRISIS_RUNBOOK.md) - Troubleshooting guide
-- [Team Guidelines](TEAM_GUIDELINES.md) - Rules for working together
-- [Agent Guides](AGENT_DOMAIN_1_EMAIL.md) - Domain-specific instructions
-
-## Team Members
-
-- **Person A** (Domain 1): Email Ingestion
-- **Person B** (Domain 2): AI Classification
-- **Person C** (Domain 3): Box Integration
-- **Product Owner**: Main orchestration, merges, decisions
-
-## Success Metrics
-
-- Classification accuracy: ≥85%
-- Extraction accuracy: ≥90%
-- End-to-end latency: <3 seconds
-- All tests passing
-- Demo working without issues
-
-## Support
-
-For issues or questions:
-1. Check [Crisis Runbook](docs/CRISIS_RUNBOOK.md)
-2. Review [Team Guidelines](TEAM_GUIDELINES.md)
-3. Look at domain-specific guide files (AGENT_DOMAIN_*.md)
+> Built at the **CascadiaJS AI Hackathon**. Powered by Cerebras inference, Box, and FastAPI.
 
 ---
 
-Built for a 24-hour hackathon. Good luck! 🚀
+## 🎬 Demo
+
+<!-- TEAMMATE: paste the video URL between the parentheses below and delete this comment -->
+**▶️ [Watch the 3-minute demo](DEMO_VIDEO_URL_HERE)**
+
+<!-- Optional: drop a screenshot/GIF in docs/ and point to it here, e.g. ![Smart Inbox in action](docs/demo.gif) -->
+<!-- SCREENSHOT_PLACEHOLDER -->
+
+See a PDF land in Box, get classified by Cerebras in well under a second, route itself into the right folder, and fire a Slack alert — end to end, no clicks.
+
+---
+
+## The Problem
+
+Knowledge workers drown in unstructured documents. Invoices, contracts, receipts, and resumes pile up in shared inboxes and "miscellaneous" folders, then someone has to manually open each one, figure out what it is, rename it, file it, and tell the right person to review it. It's slow, error-prone, and nobody's favorite part of the job.
+
+## The Solution
+
+Box Smart Inbox turns that whole chore into a zero-click pipeline:
+
+```
+   📧 Email a PDF          📤 Or upload to Box
+         │                        │
+         └───────────┬────────────┘
+                     ▼
+            ┌──────────────────┐
+            │  Box /Inbox       │  ← file lands here
+            └──────────────────┘
+                     │  FILE.UPLOADED webhook (or 60s poller)
+                     ▼
+   ┌─────────────────────────────────────────────┐
+   │  1. Extract text   (Textract → pdfplumber)   │
+   │  2. Classify       (Cerebras gpt-oss-120b)   │
+   │  3. Route          (move to typed folder)    │
+   │  4. Tag            (apply Box metadata)       │
+   │  5. Assign         (create review task)      │
+   │  6. Notify         (Slack message)           │
+   └─────────────────────────────────────────────┘
+                     ▼
+   /Invoices/2026/March   /Contracts/...   /Resumes/...
+```
+
+A 15-page contract emailed to your inbox shows up filed under `/Contracts`, tagged, assigned to legal, with a Slack ping — in seconds, no human in the loop.
+
+---
+
+## ✨ Features
+
+- **Zero-click ingestion** — Email a document or upload it to Box; a `FILE.UPLOADED` webhook (with a 60s polling fallback) picks it up automatically.
+- **Fast AI classification** — Uses Cerebras `gpt-oss-120b` for low-latency inference, with Groq and Gemini available as configurable alternate providers. Classifies into invoice, contract, resume, receipt, ID document, purchase order, or other.
+- **Field extraction** — Pulls structured fields (vendor, amount, invoice number, dates, etc.) straight out of the document text.
+- **Smart routing** — Moves the original file into the correct Box folder, auto-creating `Year/Month` subfolders for financial documents.
+- **Metadata tagging** — Applies Box metadata so documents are searchable by type, confidence, vendor, and more.
+- **Reviewer assignment** — Creates a Box review task and assigns it to the right team (finance, legal, HR, procurement).
+- **Slack notifications** — Posts a rich message with the document type, confidence, extracted fields, and a working link back to the Box file.
+- **Box UI Extension** — A React sidebar that shows classification results and lets reviewers act without leaving Box.
+- **Signature tracking** — A DocuSign-shaped workflow that records envelope and recipient state and processes DocuSign webhook events. (Live envelope sending is scaffolded; the send path currently creates tracking records rather than calling the DocuSign API.)
+- **Resilient by design** — Retry with exponential backoff on the classification call, a `DEMO_MODE` that runs the whole pipeline without live credentials, and non-fatal degradation (a failed metadata, task, or Slack step never blocks the file from being filed).
+
+---
+
+## 🏗️ Architecture
+
+The backend is organized into three independent domains that communicate only through shared type contracts — no cross-domain imports. This keeps each stage testable in isolation and easy to reason about.
+
+```
+backend/
+├── domain_1_email/            # Ingestion: SendGrid/Postmark webhooks, PDF text extraction
+│   ├── routes.py              #   email + upload endpoints
+│   ├── service.py             #   ingestion logic
+│   └── textract_parser.py     #   AWS Textract → pdfplumber fallback
+│
+├── domain_2_classifier/       # AI: classify + extract fields
+│   ├── llm_router.py          #   provider abstraction (Cerebras / Groq / Gemini, set by LLM_PROVIDER)
+│   ├── prompts.py             #   classification prompts
+│   └── service.py             #   parse + validate LLM output
+│
+├── domain_3_box_integration/  # Box: route, tag, assign, notify, sign
+│   ├── box_client.py          #   Box SDK wrapper
+│   ├── routes.py              #   webhooks (Box/DocuSign), inbox processing
+│   ├── metadata.py            #   Box metadata management
+│   ├── tasks.py               #   review-task assignment
+│   ├── notifications.py       #   Slack notifications
+│   └── approval_service.py    #   approval + signature flow
+│
+├── orchestration/             # Chains domain 1 → 2 → 3 end-to-end
+├── shared/                    # Type contracts, config, db, logging, errors
+└── main.py                    # FastAPI app + background inbox poller
+
+box-extension/                 # React + Vite + TypeScript Box UI Extension
+```
+
+### The type contracts
+
+Domains hand off via three locked Pydantic models in `backend/shared/types.py`:
+
+| Stage | Output | Carries |
+|-------|--------|---------|
+| Domain 1 → 2 | `IngestedDocument` | filename, extracted text, source, raw bytes |
+| Domain 2 → 3 | `ClassificationResult` | doc type, confidence, extracted fields, reviewer, tags |
+| Domain 3 → API | `ProcessingResult` | Box file id, destination folder, task id, assignee, status |
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **AI Inference** | Cerebras `gpt-oss-120b` (primary); Groq Llama 3.1 70B + Google Gemini selectable via `LLM_PROVIDER` |
+| **Backend** | Python 3.11, FastAPI, Uvicorn, Pydantic v2 |
+| **Document I/O** | Box SDK, AWS Textract, pdfplumber / PyPDF2 |
+| **Storage** | PostgreSQL (asyncpg); Redis container included for future async queue use |
+| **Ingestion** | SendGrid / Postmark inbound email webhooks |
+| **Signatures** | DocuSign |
+| **Notifications** | Slack incoming webhooks |
+| **Frontend** | React 18, Vite, TypeScript (Box UI Extension) |
+| **Deployment** | Docker / Docker Compose (backend), Vercel (frontend) |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.11+
+- A [Box developer app](https://developer.box.com/) (Client ID + Secret + Enterprise ID)
+- A [Cerebras](https://cloud.cerebras.ai/) API key (or Groq / Gemini)
+- Optional: SendGrid (email-in), Slack webhook URL, AWS credentials (Textract), DocuSign
+
+### 1. Clone and configure
+
+```bash
+git clone https://github.com/sabinMas/Project-Smart-Sort.git
+cd Project-Smart-Sort
+cp .env.example .env      # then fill in your keys — see .env.setup.md
+```
+
+### 2. Run with Docker (recommended)
+
+```bash
+docker-compose up
+```
+
+- API: http://localhost:8000
+- Interactive docs (Swagger): http://localhost:8000/docs
+
+### 3. Or run locally
+
+```bash
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn backend.main:app --reload
+```
+
+### 4. Try it
+
+Drop a PDF into your configured Box Inbox folder (or POST one to the API), and watch the logs sort it:
+
+```bash
+# Sort everything currently sitting in the Box Inbox folder
+curl -X POST http://localhost:8000/api/process-inbox
+
+# Or upload a document directly
+curl -X POST http://localhost:8000/api/documents/upload \
+  -H "Content-Type: application/json" \
+  -d '{"file_name": "invoice.pdf", "file_data": "<base64-encoded-pdf>"}'
+```
+
+---
+
+## ⚙️ Configuration
+
+Key environment variables (see `.env.example` and `.env.setup.md` for the full list):
+
+| Variable | Purpose |
+|----------|---------|
+| `LLM_PROVIDER` | `cerebras` (default), `groq`, or `gemini` |
+| `CEREBRAS_API_KEY` | Cerebras inference key |
+| `BOX_CLIENT_ID` / `BOX_CLIENT_SECRET` / `BOX_ENTERPRISE_ID` | Box app credentials |
+| `BOX_INBOX_FOLDER_ID` | Folder the poller watches; enables auto-sort |
+| `SENDGRID_API_KEY` | Inbound email parsing |
+| `SLACK_WEBHOOK_URL` | Slack notifications (see `SLACK_WEBHOOK_SETUP.md`) |
+| `USE_TEXTRACT` + `AWS_*` | Enable AWS Textract extraction |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `DEMO_MODE` | Skip DB connection and serve realistic demo data |
+
+---
+
+## 📡 Key Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/health` | Health check |
+| `GET`  | `/status` | Pipeline stats (documents processed, success rate) |
+| `POST` | `/webhooks/box` | Box `FILE.UPLOADED` → auto classify & sort |
+| `POST` | `/webhooks/sendgrid` | Inbound email → ingest, classify, route |
+| `POST` | `/api/process-inbox` | Sort all PDFs currently in the Box Inbox |
+| `POST` | `/api/documents/upload` | Upload a document directly (base64) |
+| `POST` | `/api/approvals/review` | Submit a human review decision |
+| `POST` | `/api/signatures/send` | Open a signature-tracking envelope (DocuSign-shaped) |
+| `POST` | `/webhooks/docusign` | DocuSign envelope events |
+| `GET`  | `/api/documents` | List processed documents with filters |
+| `GET`  | `/api/documents/{id}` | Get a single document's pipeline status |
+
+> Classification runs automatically inside the Box, email, and inbox-processing pipelines via the orchestrator. The standalone `/api/classify` and `/api/contacts/*` routes are scaffolded but not yet implemented.
+
+Full reference: [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md).
+
+---
+
+## 🧪 Testing
+
+```bash
+pytest -v                                   # full suite
+pytest backend/domain_1_email/ -v           # email ingestion
+pytest backend/domain_2_classifier/ -v      # AI classification
+pytest backend/domain_3_box_integration/ -v # Box integration
+pytest backend/tests/test_integration.py -v # end-to-end
+```
+
+Each domain has unit tests with mocked external services, so the suite runs without live API keys.
+
+---
+
+## 📦 Deployment
+
+- **Backend** — Containerized via the included `Dockerfile` / `docker-compose.yml` (FastAPI + Redis). Point the Box webhook at your public `/webhooks/box` URL (use ngrok for local demos).
+- **Frontend** — The Box UI Extension builds with Vite and deploys to Vercel (`vercel.json` is preconfigured). See [`VERCEL_DEPLOYMENT.md`](VERCEL_DEPLOYMENT.md).
+
+---
+
+## 📚 Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) — system design and data flow
+- [System Flow](docs/SYSTEM_FLOW.md) — visual end-to-end diagrams
+- [API Reference](docs/API_REFERENCE.md) — endpoint details
+- [Slack Setup](SLACK_WEBHOOK_SETUP.md) — wiring up notifications
+- [Crisis Runbook](docs/CRISIS_RUNBOOK.md) — troubleshooting
+
+---
+
+## 🔭 Roadmap
+
+- Extend confidence-gated review (already in the email/orchestrator path, threshold 0.80) to the Box webhook and inbox-poller paths
+- Live DocuSign envelope sending (signature tracking and webhook handling are already in place)
+- Implement the standalone `/api/classify` and contact-verification endpoints
+- Wire the included Redis container into an async processing queue
+- Full dashboard view of the processing pipeline
+
+---
+
+Built with care for the CascadiaJS AI Hackathon. 🚀
