@@ -4,6 +4,7 @@ import { ClassificationDisplay } from './components/ClassificationDisplay';
 import { TaskAssignment } from './components/TaskAssignment';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorMessage } from './components/ErrorMessage';
+import { getBoxContext } from './utils/boxSDK';
 
 interface ClassificationData {
   document_id: string;
@@ -28,7 +29,7 @@ interface ProcessingResult {
   error_message: string | null;
 }
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
 export const App: React.FC = () => {
   const [classification, setClassification] = useState<ClassificationData | null>(null);
@@ -36,20 +37,19 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileId, setFileId] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
 
   // Initialize: Get file ID from Box context
   useEffect(() => {
     const initializeExtension = async () => {
       try {
-        // In a real implementation, this would use Box Web Components
-        // to get the current file context
-        const currentFileId = localStorage.getItem('currentBoxFileId');
-        if (currentFileId) {
-          setFileId(currentFileId);
-          await fetchClassification(currentFileId);
-        }
+        const boxContext = await getBoxContext();
+        setFileId(boxContext.fileId);
+        setFileName(boxContext.fileName);
+        await fetchClassification(boxContext.fileId);
       } catch (err) {
-        setError('Failed to initialize extension. Make sure you have a file selected.');
+        setError('Failed to initialize extension. Make sure you have a file selected in Box.');
+        console.error('Initialization error:', err);
       }
     };
 
@@ -87,6 +87,7 @@ export const App: React.FC = () => {
     <div className="app-container">
       <header className="app-header">
         <h1>📋 Document Classification</h1>
+        {fileName && <p className="file-name">{fileName}</p>}
         <button className="refresh-btn" onClick={handleRefresh} disabled={loading}>
           {loading ? 'Loading...' : '🔄 Refresh'}
         </button>

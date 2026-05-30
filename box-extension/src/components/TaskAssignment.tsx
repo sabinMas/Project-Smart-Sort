@@ -8,6 +8,8 @@ interface TaskAssignmentProps {
   fileId: string;
 }
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+
 export const TaskAssignment: React.FC<TaskAssignmentProps> = ({
   reviewer,
   docType,
@@ -29,7 +31,7 @@ export const TaskAssignment: React.FC<TaskAssignmentProps> = ({
     setMessage('');
 
     try {
-      const response = await fetch('http://localhost:8000/tasks/create', {
+      const response = await fetch(`${BACKEND_URL}/tasks/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -45,10 +47,11 @@ export const TaskAssignment: React.FC<TaskAssignmentProps> = ({
         setAssignedTo('');
         setDueDate('');
       } else {
-        setMessage('❌ Failed to assign task. Please try again.');
+        const errorData = await response.json().catch(() => ({}));
+        setMessage(`❌ Failed to assign task: ${errorData.detail || response.statusText}`);
       }
     } catch (err) {
-      setMessage('❌ Error connecting to backend');
+      setMessage(`❌ Error connecting to backend: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }

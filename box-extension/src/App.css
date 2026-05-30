@@ -18,12 +18,23 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .app-header h1 {
   margin: 0;
   font-size: 1.5rem;
   font-weight: 600;
+  flex: 1;
+}
+
+.app-header .file-name {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.9;
+  flex-basis: 100%;
+  padding-left: 0.2rem;
 }
 
 .refresh-btn {
