@@ -19,6 +19,207 @@ See a PDF land in Box, get classified by Cerebras in well under a second, route 
 
 ---
 
+## 🗺️ User Flow
+
+The complete journey from document arrival to filed-and-assigned — every path, every branch.
+
+### Primary Flow: Email → Auto-Sort
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          USER SENDS A DOCUMENT                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+               │                          │                        │
+               ▼                          ▼                        ▼
+     📧 Email PDF to              📂 Drop PDF into          🖥️ POST to API
+      inbox address               Box /Inbox folder         /api/documents/upload
+               │                          │                        │
+               ▼                          ▼                        │
+   SendGrid webhook fires      FILE.UPLOADED webhook fires         │
+   POST /webhooks/sendgrid     POST /webhooks/box                  │
+         (or /webhooks/email)  (or 60-second background poller)    │
+               │                          │                        │
+               └──────────────────────────┴────────────────────────┘
+                                          │
+                                          ▼
+                         ┌────────────────────────────────┐
+                         │     DOMAIN 1 — INGESTION       │
+                         │  EmailIngestionService          │
+                         │                                │
+                         │  • Decode/extract attachment   │
+                         │  • Text extraction pipeline:   │
+                         │    AWS Textract (if enabled)   │
+                         │      ↓ (fallback)              │
+                         │    pdfplumber                  │
+                         │      ↓ (fallback)              │
+                         │    PyPDF2                      │
+                         │                                │
+                         │  Output: IngestedDocument      │
+                         │  (filename, text, raw bytes,   │
+                         │   source, email_from)          │
+                         └────────────────────────────────┘
+                                          │
+                                          ▼
+                         ┌────────────────────────────────┐
+                         │     DOMAIN 2 — AI CLASSIFY     │
+                         │  ClassificationService          │
+                         │                                │
+                         │  • LLMRouter selects provider: │
+                         │    Cerebras gpt-oss-120b ←─── default
+                         │    Groq Llama 3.1 70B   ←─── LLM_PROVIDER=groq
+                         │    Google Gemini         ←─── LLM_PROVIDER=gemini
+                         │                                │
+                         │  • LLM returns JSON:           │
+                         │    - doc_type                  │
+                         │    - confidence (0.0 – 1.0)    │
+                         │    - reasoning                 │
+                         │    - extracted_fields          │
+                         │      (vendor, amount, dates…)  │
+                         │    - metadata_tags             │
+                         │                                │
+                         │  Output: ClassificationResult  │
+                         └────────────────────────────────┘
+                                          │
+                          ┌───────────────┴───────────────┐
+                          │  Confidence ≥ 0.80?           │
+                          └───────────────────────────────┘
+                          │ YES                     │ NO
+                          ▼                         ▼
+              Continue pipeline          Mark status: pending_manual_review
+                                         Assigned reviewer notified
+                                         Human makes decision via
+                                         POST /api/approvals/review
+                                                    │
+                                         ┌──────────┴──────────┐
+                                         │ approve / reject /  │
+                                         │ flag / edit         │
+                                         └─────────────────────┘
+                          │
+                          ▼
+                         ┌────────────────────────────────┐
+                         │    DOMAIN 3 — BOX ROUTING      │
+                         │  BoxIntegrationService          │
+                         │                                │
+                         │  Step 1: ROUTE                 │
+                         │  Map doc_type → folder:        │
+                         │   invoice  → /Invoices/YY/MM   │
+                         │   contract → /Contracts/YY/MM  │
+                         │   resume   → /Resumes          │
+                         │   receipt  → /Receipts/YY/MM   │
+                         │   id_doc   → /ID Documents     │
+                         │   PO       → /Purchase Orders  │
+                         │   other    → /Other Documents  │
+                         │  Auto-create Year/Month tree   │
+                         │  Upload file to destination    │
+                         │                                │
+                         │  Step 2: TAG                   │
+                         │  Apply Box metadata:           │
+                         │   type, confidence, vendor,    │
+                         │   amount, tags                 │
+                         │                                │
+                         │  Step 3: ASSIGN                │
+                         │  Map doc_type → reviewer role: │
+                         │   invoice/receipt → finance    │
+                         │   contract        → legal      │
+                         │   resume/id_doc   → hr         │
+                         │   purchase_order  → procurement│
+                         │  Create Box review task        │
+                         │  Assign to reviewer email      │
+                         │                                │
+                         │  Step 4: NOTIFY                │
+                         │  Slack: type, confidence,      │
+                         │   vendor, amount, reviewer,    │
+                         │   Box link, ⚠️ urgency flag    │
+                         │   (invoice > $10k)             │
+                         │                                │
+                         │  Output: ProcessingResult      │
+                         └────────────────────────────────┘
+                                          │
+                          ┌───────────────┴───────────────┐
+                          │  Signature required?          │
+                          └───────────────────────────────┘
+                          │ YES                     │ NO
+                          ▼                         ▼
+   POST /api/signatures/send              ✅ DONE
+   Create DocuSign envelope               Document filed, tagged,
+   Send to recipients via email           assigned, and Slack'd
+             │
+             ▼
+   DocuSign events → POST /webhooks/docusign
+   Track state: pending → sent → opened → signed
+             │
+   All signatures collected?
+             │ YES
+             ▼
+   Move file to archive folder
+   Mark document complete
+             │
+             ▼
+         ✅ DONE
+```
+
+### Parallel Path: Box UI Extension (In-Box Sidebar)
+
+```
+  Reviewer opens file in Box
+           │
+           ▼
+  React sidebar loads
+  Fetches BOX_CONTEXT (file ID)
+           │
+           ▼
+  GET /api/documents/{fileId}
+           │
+           ▼
+  ┌──────────────────────────────┐
+  │  ClassificationDisplay       │
+  │  • Document type badge       │
+  │  • Confidence meter          │
+  │    🟢 ≥85%  🟡 ≥70%  🔴 <70% │
+  │  • AI reasoning              │
+  │  • Extracted fields table    │
+  │  • Metadata tags             │
+  ├──────────────────────────────┤
+  │  WorkflowStatus              │
+  │  • Box file ID               │
+  │  • Destination folder        │
+  │  • Assigned reviewer         │
+  │  • Notification channels     │
+  ├──────────────────────────────┤
+  │  TaskAssignment              │
+  │  • Current assignee          │
+  │  • Reassign / modify task    │
+  └──────────────────────────────┘
+```
+
+### Document Status Lifecycle
+
+```
+  ingested ──► classified ──► routed_to_box ──► complete
+                    │
+               (low confidence)
+                    │
+                    ▼
+            pending_manual_review ──► approved ──► routed_to_box ──► complete
+                                  └─► rejected ──► archived
+```
+
+### Error Resilience
+
+```
+  Any step in Domain 3 fails?
+           │
+           ▼
+  Log error — do NOT block
+           │
+           ├── Metadata tag fails? → File still routed ✓
+           ├── Task creation fails? → File still routed ✓
+           ├── Slack notification fails? → File still routed ✓
+           └── Classification fails? → 3 retries (2s → 4s → 8s backoff)
+```
+
+---
+
 ## The Problem
 
 Knowledge workers drown in unstructured documents. Invoices, contracts, receipts, and resumes pile up in shared inboxes and "miscellaneous" folders, then someone has to manually open each one, figure out what it is, rename it, file it, and tell the right person to review it. It's slow, error-prone, and nobody's favorite part of the job.
