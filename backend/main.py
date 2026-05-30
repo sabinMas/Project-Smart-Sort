@@ -10,6 +10,7 @@ from backend.shared.database import db
 from backend.domain_1_email import routes as domain1_routes
 from backend.domain_2_classifier import routes as domain2_routes
 from backend.domain_3_box_integration import routes as domain3_routes
+from backend.orchestration import routes as orchestration_routes
 
 # Setup logging
 setup_logging(Config.LOG_LEVEL)
@@ -60,6 +61,7 @@ async def shutdown():
 app.include_router(domain1_routes.router, tags=["domain-1"])
 app.include_router(domain2_routes.router, tags=["domain-2"])
 app.include_router(domain3_routes.router, tags=["domain-3"])
+app.include_router(orchestration_routes.router, tags=["orchestration"])
 
 
 @app.get("/health")

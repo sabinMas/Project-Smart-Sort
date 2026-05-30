@@ -14,6 +14,7 @@ from backend.shared.errors import (
     InvalidEmailFormatError,
     AttachmentExtractionError,
 )
+from backend.orchestration import get_orchestrator
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -86,7 +87,7 @@ async def handle_sendgrid_webhook(request: Request) -> dict:
             if not is_valid:
                 raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
-        # Process the email
+        # Step 1: DOMAIN 1 - Process the email
         document = await email_service.ingest_email(
             from_email=from_email,
             to_email=to_email,
@@ -98,11 +99,45 @@ async def handle_sendgrid_webhook(request: Request) -> dict:
 
         logger.info(f"Email ingested successfully: document_id={document.id}")
 
-        return {
-            "status": "success",
-            "document_id": document.id,
-            "filename": document.filename,
-        }
+        # Step 2: AUTO-TRIGGER ORCHESTRATION (Domain 2 → Domain 3)
+        # This chains classification and Box routing automatically
+        try:
+            logger.info(f"Starting automatic orchestration for {document.id}...")
+            orchestrator = get_orchestrator()
+            processing_result = await orchestrator.process_ingested_document(document)
+
+            # Build response showing full pipeline
+            return {
+                "status": "success",
+                "document_id": document.id,
+                "filename": document.filename,
+                "pipeline": {
+                    "domain_1_ingestion": "✅ Complete",
+                    "domain_2_classification": {
+                        "status": "✅ Complete",
+                        "type": processing_result.status if processing_result else "unknown",
+                        "error": processing_result.error_message if processing_result else None,
+                    },
+                    "domain_3_box_routing": {
+                        "status": "✅ Complete" if processing_result and processing_result.box_file_id else "⏸️ Pending Review",
+                        "destination": processing_result.destination_folder if processing_result else None,
+                        "task_id": processing_result.task_id if processing_result else None,
+                        "assigned_to": processing_result.assigned_to if processing_result else None,
+                    },
+                },
+                "processing_result": processing_result.dict() if processing_result else None,
+            }
+
+        except Exception as orchestration_error:
+            logger.error(f"Orchestration failed (will mark for manual review): {orchestration_error}")
+            # Return partial success - email was ingested, but orchestration failed
+            return {
+                "status": "partial_success",
+                "document_id": document.id,
+                "filename": document.filename,
+                "warning": "Email ingested but automatic orchestration failed. Document marked for manual review.",
+                "error": str(orchestration_error),
+            }
 
     except HTTPException:
         raise
