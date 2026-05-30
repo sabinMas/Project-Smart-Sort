@@ -432,17 +432,20 @@ class BoxClient:
             return True
 
         try:
+            from box_sdk_gen.schemas.create_task_assignment_by_task_id import (
+                CreateTaskAssignmentByTaskIdAssignTo,
+            )
             await asyncio.to_thread(
-                self.client.tasks.create_task_assignment,
+                self.client.task_assignments.create_task_assignment_by_task_id,
                 task_id=task_id,
-                assign_to={"login": user_email},
+                assign_to=CreateTaskAssignmentByTaskIdAssignTo(login=user_email),
             )
             logger.info(f"Assigned task {task_id} to {user_email}")
             return True
         except Exception as e:
-            raise BoxIntegrationError(
-                f"Failed to assign task {task_id} to {user_email}: {e}"
-            )
+            # Task assignment is non-critical — log and continue
+            logger.warning(f"Could not assign task {task_id} to {user_email}: {e}")
+            return False
 
     async def apply_metadata(
         self,
