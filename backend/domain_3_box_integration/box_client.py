@@ -40,9 +40,7 @@ class BoxClient:
 
         # Live mode: initialize real Box SDK client
         try:
-            from box_sdk_gen import BoxClient as SdkBoxClient
-            from box_sdk_gen.managers.authorization import AuthorizeUser
-            from box_sdk_gen import BoxCCGAuth, CCGConfig
+            from box_sdk_gen import BoxClient as SdkBoxClient, BoxCCGAuth, CCGConfig
 
             ccg_config = CCGConfig(
                 client_id=Config.BOX_CLIENT_ID,
@@ -52,8 +50,8 @@ class BoxClient:
             auth = BoxCCGAuth(config=ccg_config)
             self.client = SdkBoxClient(auth=auth)
             logger.info("BoxClient initialized with CCG authentication")
-        except ImportError:
-            logger.warning("box-sdk-gen not available, falling back to demo mode")
+        except ImportError as e:
+            logger.warning(f"box-sdk-gen not available ({e}), falling back to demo mode")
             self._demo_mode = True
         except Exception as e:
             raise BoxAuthenticationError(f"Failed to authenticate with Box: {e}")
