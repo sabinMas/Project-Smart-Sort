@@ -51,15 +51,36 @@ class Config:
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
+    # Database
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://localhost/document_orchestration")
+    DATABASE_POOL_SIZE: int = int(os.getenv("DATABASE_POOL_SIZE", "5"))
+    DATABASE_TIMEOUT_SEC: int = int(os.getenv("DATABASE_TIMEOUT_SEC", "30"))
+
     # Domain 3: Box Integration
     BOX_CLIENT_ID: str = os.getenv("BOX_CLIENT_ID", "")
     BOX_CLIENT_SECRET: str = os.getenv("BOX_CLIENT_SECRET", "")
     BOX_ENTERPRISE_ID: str = os.getenv("BOX_ENTERPRISE_ID", "")
     BOX_DEMO_FOLDER_ID: str = os.getenv("BOX_DEMO_FOLDER_ID", "0")
+    BOX_INBOX_FOLDER_ID: str = os.getenv("BOX_INBOX_FOLDER_ID", "")
+    BOX_NEEDS_REVIEW_FOLDER_ID: str = os.getenv("BOX_NEEDS_REVIEW_FOLDER_ID", "")
+    BOX_NEEDS_SIGNATURE_FOLDER_ID: str = os.getenv("BOX_NEEDS_SIGNATURE_FOLDER_ID", "")
+    BOX_PENDING_RETURN_FOLDER_ID: str = os.getenv("BOX_PENDING_RETURN_FOLDER_ID", "")
+    BOX_ARCHIVE_FOLDER_ID: str = os.getenv("BOX_ARCHIVE_FOLDER_ID", "")
+
+    # DocuSign Integration
+    DOCUSIGN_ACCOUNT_ID: str = os.getenv("DOCUSIGN_ACCOUNT_ID", "")
+    DOCUSIGN_CLIENT_ID: str = os.getenv("DOCUSIGN_CLIENT_ID", "")
+    DOCUSIGN_CLIENT_SECRET: str = os.getenv("DOCUSIGN_CLIENT_SECRET", "")
+    DOCUSIGN_PRIVATE_KEY: str = os.getenv("DOCUSIGN_PRIVATE_KEY", "")
+    DOCUSIGN_WEBHOOK_SECRET: str = os.getenv("DOCUSIGN_WEBHOOK_SECRET", "")
+    DOCUSIGN_SANDBOX_MODE: bool = os.getenv("DOCUSIGN_SANDBOX_MODE", "true").lower() == "true"
+    DOCUSIGN_SIGNATURE_EXPIRY_DAYS: int = int(os.getenv("DOCUSIGN_SIGNATURE_EXPIRY_DAYS", "14"))
+    DOCUSIGN_REMINDER_INTERVAL_DAYS: int = int(os.getenv("DOCUSIGN_REMINDER_INTERVAL_DAYS", "7"))
 
     # Notifications
     SLACK_WEBHOOK_URL: str = os.getenv("SLACK_WEBHOOK_URL", "")
     SLACK_BOT_TOKEN: str = os.getenv("SLACK_BOT_TOKEN", "")
+    SENDGRID_FROM_EMAIL: str = os.getenv("SENDGRID_FROM_EMAIL", "noreply@company.com")
 
     # Webhooks
     WEBHOOK_PRIMARY_KEY: str = os.getenv("WEBHOOK_PRIMARY_KEY", "")

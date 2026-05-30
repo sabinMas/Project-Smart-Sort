@@ -6,9 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.shared.config import Config
 from backend.shared.logging import setup_logging
 from backend.shared.types import IngestedDocument, ProcessingResult
-from backend.domain_1_email.routes import router as email_router
-from backend.domain_2_classifier.service import ClassificationService
-from backend.domain_3_box_integration.service import BoxIntegrationService
+from backend.shared.database import db
 
 # Setup logging
 setup_logging(Config.LOG_LEVEL)
@@ -17,8 +15,8 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app
 app = FastAPI(
     title="Box Smart Inbox",
-    description="AI-powered document intake, classification, and routing system",
-    version="0.1.0",
+    description="AI-powered document orchestration with signature tracking",
+    version="1.0.0",
 )
 
 # Add CORS middleware
@@ -30,15 +28,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include domain 1 routes
-app.include_router(email_router)
+# Database startup and shutdown
+@app.on_event("startup")
+async def startup():
+    """Initialize database connection on startup."""
+    logger.info("Starting Box Smart Inbox application")
+    try:
+        await db.connect()
+        logger.info("Database connected successfully")
+    except Exception as e:
+        logger.error(f"Failed to connect to database: {e}")
+        raise
 
-# Initialize services
-classification_service = ClassificationService()
-box_service = BoxIntegrationService()
 
-# Track processing state (in-memory for hackathon)
-documents_processed = []
+@app.on_event("shutdown")
+async def shutdown():
+    """Close database connection on shutdown."""
+    logger.info("Shutting down Box Smart Inbox application")
+    await db.disconnect()
+    logger.info("Database disconnected")
 
 
 @app.get("/health")

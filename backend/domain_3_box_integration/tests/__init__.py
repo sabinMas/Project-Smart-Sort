@@ -1,1 +1,1 @@
-"""Tests for Domain 3: Box Integration."""
+"""Tests for Domain 3."""
