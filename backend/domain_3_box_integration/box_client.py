@@ -1,5 +1,6 @@
 """Box SDK wrapper for Domain 3: Box Integration."""
 
+import asyncio
 from typing import Optional, Dict, Any, List
 from backend.shared.config import Config
 from backend.shared.errors import (
@@ -90,7 +91,9 @@ class BoxClient:
             with open(file_path, "rb") as f:
                 file_content = f.read()
 
-            uploaded_file = self.client.uploads.upload_file(
+            # Use asyncio.to_thread to run synchronous Box SDK call without blocking
+            uploaded_file = await asyncio.to_thread(
+                self.client.uploads.upload_file,
                 attributes={
                     "name": file_name,
                     "parent": {"id": folder_id},

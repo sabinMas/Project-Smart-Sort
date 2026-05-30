@@ -1,6 +1,6 @@
 """Metadata management for Domain 3: Box Integration."""
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from backend.shared.types import ClassificationResult
 from backend.shared.errors import MetadataApplicationError
 from backend.shared.logging import get_logger
@@ -11,9 +11,13 @@ logger = get_logger(__name__)
 class MetadataManager:
     """Manages metadata template application to Box files."""
 
-    def __init__(self):
-        """Initialize metadata manager."""
-        pass
+    def __init__(self, box_client: Optional[Any] = None):
+        """Initialize metadata manager with optional Box client.
+
+        Args:
+            box_client: BoxClient instance for applying metadata
+        """
+        self.box_client = box_client
 
     async def apply_metadata(
         self,
@@ -42,10 +46,23 @@ class MetadataManager:
         except ValueError as e:
             raise MetadataApplicationError(f"Invalid metadata: {e}")
 
-        logger.info(
-            f"Metadata validated for file {file_id}, "
-            f"template={template_name}, fields={list(metadata.keys())}"
-        )
+        # Actually apply metadata if BoxClient is available
+        if self.box_client:
+            try:
+                await self.box_client.apply_metadata(file_id, metadata)
+                logger.info(
+                    f"Metadata applied for file {file_id}, "
+                    f"template={template_name}, fields={list(metadata.keys())}"
+                )
+            except Exception as e:
+                raise MetadataApplicationError(f"Failed to apply metadata: {e}")
+        else:
+            logger.info(
+                f"Metadata validated for file {file_id}, "
+                f"template={template_name}, fields={list(metadata.keys())} "
+                f"(no BoxClient available)"
+            )
+
         return True
 
     def _validate_metadata(self, metadata: Dict[str, Any]) -> bool:

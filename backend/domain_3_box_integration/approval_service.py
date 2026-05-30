@@ -88,6 +88,12 @@ class ApprovalService:
         else:
             from backend.shared.database import db
 
+            # Validate document_id is a valid UUID
+            try:
+                doc_uuid = uuid.UUID(document_id)
+            except ValueError:
+                raise BoxIntegrationError(f"Invalid document ID format: {document_id}")
+
             await db.execute(
                 """
                 INSERT INTO approvals (id, document_id, action, decision_reason,
@@ -95,7 +101,7 @@ class ApprovalService:
                 VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8)
                 """,
                 uuid.UUID(approval_id),
-                uuid.UUID(document_id),
+                doc_uuid,
                 action,
                 reason,
                 final_recipients,

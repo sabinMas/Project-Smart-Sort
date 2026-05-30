@@ -1,8 +1,9 @@
 """LLM provider router for Domain 2: AI Classification."""
 
-from typing import Dict, Any
+import asyncio
 from abc import ABC, abstractmethod
-from backend.shared.config import Config, LLMProvider as LLMProviderEnum
+from backend.shared.config import Config
+from backend.shared.config import LLMProvider as LLMProviderEnum
 from backend.shared.logging import get_logger
 from backend.shared.errors import LLMProviderError
 
@@ -30,53 +31,49 @@ class BaseLLMProvider(ABC):
         raise NotImplementedError()
 
 
-class CerebasProvider(BaseLLMProvider):
-    """Cerebras Llama 3.1 8B provider."""
+class CerebrasProvider(BaseLLMProvider):
+    """Cerebras provider using OpenAI-compatible chat completions API."""
+
+    # gpt-oss-120b is the production model on Cerebras as of May 2026
+    MODEL = "gpt-oss-120b"
 
     async def call(self, system_prompt: str, user_prompt: str) -> str:
         """
-        TODO: Implement Cerebras API call.
+        Call Cerebras inference API using the OpenAI-compatible SDK.
 
-        1. Initialize Cerebras client with API key
-        2. Call Llama 3.1 8B model
-        3. Parse JSON response
-        4. Validate response format
-        5. Return JSON string
-
-        Use model: "llama-3.1-8b"
+        Uses client.chat.completions.create() with messages array.
         """
         try:
             from cerebras.cloud.sdk import Cerebras
 
-            # 1. Initialize Cerebras client with API key
             client = Cerebras(api_key=Config.CEREBRAS_API_KEY)
 
-            # 2. Call Llama 3.1 8B model
-            response = client.messages.create(
-                model="llama-3.1-8b",
-                system=system_prompt,
+            # Cerebras uses OpenAI-compatible chat completions API
+            response = client.chat.completions.create(
+                model=self.MODEL,
                 messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt,
+                    },
                     {
                         "role": "user",
                         "content": user_prompt,
-                    }
+                    },
                 ],
+                temperature=0.2,
+                max_tokens=2048,
             )
 
-            # 3. Parse JSON response
-            content = response.content[0].text if response.content else ""
+            content = response.choices[0].message.content if response.choices else ""
 
             logger.debug(f"Cerebras response: {content[:200]}...")
 
-            # 4. Validate response format (should be JSON)
-            # The response should be JSON, but we'll validate in the service layer
-
-            # 5. Return JSON string
             return content
 
         except ImportError:
             raise LLMProviderError(
-                "Cerebras SDK not installed. Install with: pip install cerebras-sdk"
+                "Cerebras SDK not installed. Install with: pip install cerebras_cloud_sdk"
             )
         except Exception as e:
             logger.error(f"Cerebras API error: {str(e)}")
@@ -86,44 +83,39 @@ class CerebasProvider(BaseLLMProvider):
 class GroqProvider(BaseLLMProvider):
     """Groq LLM provider (fallback)."""
 
+    MODEL = "llama-3.1-70b-versatile"
+
     async def call(self, system_prompt: str, user_prompt: str) -> str:
         """
-        TODO: Implement Groq API call.
+        Call Groq API using their Python SDK.
 
-        1. Initialize Groq client with API key
-        2. Call LLM model (e.g., mixtral)
-        3. Parse JSON response
-        4. Validate response format
-        5. Return JSON string
+        Uses OpenAI-compatible chat completions with system message in messages array.
         """
         try:
             from groq import Groq
 
-            # 1. Initialize Groq client with API key
             client = Groq(api_key=Config.GROQ_API_KEY)
 
-            # 2. Call LLM model
             response = client.chat.completions.create(
-                model="mixtral-8x7b-32768",
-                system=system_prompt,
+                model=self.MODEL,
                 messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt,
+                    },
                     {
                         "role": "user",
                         "content": user_prompt,
-                    }
+                    },
                 ],
-                temperature=0.3,
+                temperature=0.2,
+                max_tokens=2048,
             )
 
-            # 3. Parse JSON response
             content = response.choices[0].message.content if response.choices else ""
 
             logger.debug(f"Groq response: {content[:200]}...")
 
-            # 4. Validate response format (should be JSON)
-            # The response should be JSON, but we'll validate in the service layer
-
-            # 5. Return JSON string
             return content
 
         except ImportError:
@@ -138,35 +130,24 @@ class GroqProvider(BaseLLMProvider):
 class GeminiProvider(BaseLLMProvider):
     """Google Gemini provider (fallback)."""
 
+    MODEL = "gemini-pro"
+
     async def call(self, system_prompt: str, user_prompt: str) -> str:
         """
-        TODO: Implement Google Gemini API call.
-
-        1. Initialize Gemini client with API key
-        2. Call Gemini model
-        3. Parse JSON response
-        4. Validate response format
-        5. Return JSON string
+        Call Google Gemini API.
         """
         try:
             import google.generativeai as genai
 
-            # 1. Initialize Gemini client with API key
             genai.configure(api_key=Config.GEMINI_API_KEY)
-            model = genai.GenerativeModel("gemini-pro", system_instruction=system_prompt)
+            model = genai.GenerativeModel(self.MODEL, system_instruction=system_prompt)
 
-            # 2. Call Gemini model
             response = model.generate_content(user_prompt)
 
-            # 3. Parse JSON response
             content = response.text if response else ""
 
             logger.debug(f"Gemini response: {content[:200]}...")
 
-            # 4. Validate response format (should be JSON)
-            # The response should be JSON, but we'll validate in the service layer
-
-            # 5. Return JSON string
             return content
 
         except ImportError:
@@ -194,11 +175,11 @@ class LLMRouter:
             BaseLLMProvider: The selected provider
 
         Raises:
-            ConfigurationError: If provider is not supported
+            ValueError: If provider is not supported
         """
         if self.provider_name == LLMProviderEnum.CEREBRAS:
             logger.info("Using Cerebras provider")
-            return CerebasProvider()
+            return CerebrasProvider()
         elif self.provider_name == LLMProviderEnum.GROQ:
             logger.info("Using Groq provider")
             return GroqProvider()
@@ -210,7 +191,7 @@ class LLMRouter:
 
     async def call(self, system_prompt: str, user_prompt: str) -> str:
         """
-        Route LLM call to the selected provider.
+        Route LLM call to the selected provider with retry logic.
 
         Args:
             system_prompt: System-level instructions
@@ -220,6 +201,19 @@ class LLMRouter:
             str: The LLM response
 
         Raises:
-            LLMProviderError: If the API call fails
+            LLMProviderError: If the API call fails after retries
         """
-        return await self.provider.call(system_prompt, user_prompt)
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                return await self.provider.call(system_prompt, user_prompt)
+            except LLMProviderError:
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    logger.warning(
+                        f"LLM call failed (attempt {attempt + 1}/{max_retries}), "
+                        f"retrying in {wait_time}s..."
+                    )
+                    await asyncio.sleep(wait_time)
+                else:
+                    raise
