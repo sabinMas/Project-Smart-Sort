@@ -1,0 +1,4 @@
+{
+  "buildCommand": "cd box-extension && npm run build",
+  "outputDirectory": "box-extension/dist"
+}
