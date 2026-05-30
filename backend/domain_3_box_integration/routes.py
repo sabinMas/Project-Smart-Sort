@@ -360,6 +360,145 @@ async def handle_box_webhook(request: Request) -> dict:
     }
 
 
+@router.post("/api/process-inbox", tags=["inbox"])
+async def process_inbox() -> dict:
+    """Process all PDF files currently sitting in the Box Inbox folder.
+
+    Use this to:
+    - Sort files that were uploaded before the webhook was set up
+    - Manually re-trigger sorting for any reason
+    - Demo: instantly sort all inbox files on demand
+
+    Returns results for each file processed.
+    """
+    import io
+    from backend.shared.config import Config
+    from backend.shared.types import IngestedDocument
+    from backend.domain_2_classifier.service import ClassificationService
+    from backend.domain_3_box_integration.metadata import MetadataManager
+    from backend.domain_3_box_integration.tasks import TaskManager, REVIEWER_EMAIL_MAPPING
+    from backend.domain_3_box_integration.notifications import NotificationManager
+    from backend.shared.config import FOLDER_MAPPING, REVIEWER_MAPPING
+    from backend.domain_1_email.textract_parser import get_textract_parser
+    from datetime import datetime, timezone
+
+    box_client = BoxClient()
+    inbox_folder_id = Config.BOX_INBOX_FOLDER_ID
+
+    if not inbox_folder_id:
+        raise HTTPException(status_code=500, detail="BOX_INBOX_FOLDER_ID not configured")
+
+    # List all files in Inbox
+    try:
+        files = await box_client.list_files(inbox_folder_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not list inbox files: {e}")
+
+    if not files:
+        return {"status": "empty", "message": "No files found in Inbox", "processed": []}
+
+    logger.info(f"Processing {len(files)} files from Inbox (folder {inbox_folder_id})")
+
+    results = []
+
+    for file_info in files:
+        file_id   = file_info["id"]
+        file_name = file_info["name"]
+
+        # Skip non-PDFs
+        if not file_name.lower().endswith(".pdf"):
+            results.append({"file": file_name, "status": "skipped", "reason": "not a PDF"})
+            continue
+
+        logger.info(f"📄 Processing: {file_name} (id={file_id})")
+
+        try:
+            # Download
+            file_bytes = await box_client.download_file(file_id)
+
+            # Extract text
+            extracted_text = await get_textract_parser().extract_pdf_text(file_bytes, file_name)
+            if not extracted_text:
+                try:
+                    import pdfplumber
+                    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                        extracted_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
+                except Exception:
+                    extracted_text = f"[Could not extract text from {file_name}]"
+
+            # Classify
+            document = IngestedDocument(
+                filename=file_name,
+                content=extracted_text,
+                content_type="application/pdf",
+                source="box_file_request",
+                raw_file_bytes=file_bytes,
+            )
+            classifier = ClassificationService()
+            classification = await classifier.classify(document)
+            logger.info(f"  ✓ {classification.doc_type} ({classification.confidence:.0%})")
+
+            # Determine destination
+            base_path = FOLDER_MAPPING.get(classification.doc_type, "/Other Documents")
+            now = datetime.now(timezone.utc)
+            if classification.doc_type in ("invoice", "contract", "receipt", "purchase_order"):
+                destination = f"{base_path}/{now.year}/{now.strftime('%B')}"
+            else:
+                destination = base_path
+
+            # Move file
+            dest_folder_id = await box_client.get_or_create_folder(destination)
+            await box_client.move_file(file_id, dest_folder_id)
+            logger.info(f"  ✓ Moved → {destination}")
+
+            # Metadata + task (non-fatal)
+            try:
+                metadata_manager = MetadataManager()
+                metadata = metadata_manager.build_metadata_dict(classification)
+                await box_client.apply_metadata(file_id, metadata)
+            except Exception:
+                pass
+
+            task_id = None
+            reviewer_email = None
+            try:
+                task_manager = TaskManager(box_client)
+                reviewer_role  = REVIEWER_MAPPING.get(classification.doc_type)
+                reviewer_email = REVIEWER_EMAIL_MAPPING.get(reviewer_role) if reviewer_role else None
+                task_id = await task_manager.create_review_task(
+                    file_id=file_id,
+                    doc_type=classification.doc_type,
+                    assigned_to_email=reviewer_email,
+                )
+            except Exception:
+                pass
+
+            results.append({
+                "file": file_name,
+                "status": "sorted",
+                "doc_type": classification.doc_type,
+                "confidence": f"{classification.confidence:.0%}",
+                "destination": destination,
+                "task_id": task_id,
+                "assigned_to": reviewer_email,
+                "extracted_fields": classification.extracted_fields,
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to process {file_name}: {e}")
+            results.append({"file": file_name, "status": "failed", "error": str(e)})
+
+    sorted_count = sum(1 for r in results if r["status"] == "sorted")
+    logger.info(f"✅ Inbox processed: {sorted_count}/{len(files)} files sorted")
+
+    return {
+        "status": "complete",
+        "total": len(files),
+        "sorted": sorted_count,
+        "results": results,
+    }
+
+
 @router.get("/documents/{file_id}", tags=["documents"])
 async def get_document_by_box_file_id(file_id: str) -> dict:
     """Get classification data for a Box file ID.
