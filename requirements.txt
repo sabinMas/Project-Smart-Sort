@@ -17,9 +17,10 @@ postmark==1.0.0
 pydantic==2.6.1
 pydantic-settings==2.1.0
 
-# Async
+# Async & Database
 httpx==0.25.2
 aiofiles==23.2.1
+asyncpg==0.31.0
 
 # Optional: Redis (for async queue)
 redis==5.0.1
