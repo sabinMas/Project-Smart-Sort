@@ -579,6 +579,8 @@ class DocumentService:
             f"SELECT COUNT(*) FROM documents {where_clause}", *params
         )
 
+        limit_idx = len(params) + 1
+        offset_idx = len(params) + 2
         params.extend([limit, offset])
         rows = await db.fetch_all(
             f"""
@@ -586,7 +588,7 @@ class DocumentService:
                    box_folder_current, created_at, approved_at, sent_at
             FROM documents {where_clause}
             ORDER BY created_at DESC
-            LIMIT ${param_idx} OFFSET ${param_idx + 1}
+            LIMIT ${limit_idx} OFFSET ${offset_idx}
             """,
             *params,
         )

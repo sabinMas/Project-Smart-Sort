@@ -130,7 +130,8 @@ class BoxClient:
             return file_id
 
         try:
-            updated_file = self.client.files.update_file_by_id(
+            updated_file = await asyncio.to_thread(
+                self.client.files.update_file_by_id,
                 file_id=file_id,
                 parent={"id": destination_folder_id},
             )
@@ -214,7 +215,10 @@ class BoxClient:
             Optional[str]: Folder ID if found, None otherwise
         """
         try:
-            items = self.client.folders.get_folder_items(folder_id=parent_id)
+            items = await asyncio.to_thread(
+                self.client.folders.get_folder_items,
+                folder_id=parent_id,
+            )
             for item in items.entries:
                 if item.type == "folder" and item.name == folder_name:
                     return item.id
@@ -233,7 +237,8 @@ class BoxClient:
             str: New folder ID
         """
         try:
-            folder = self.client.folders.create_folder(
+            folder = await asyncio.to_thread(
+                self.client.folders.create_folder,
                 name=folder_name,
                 parent={"id": parent_id},
             )
@@ -262,7 +267,10 @@ class BoxClient:
             return []
 
         try:
-            items = self.client.folders.get_folder_items(folder_id=folder_id)
+            items = await asyncio.to_thread(
+                self.client.folders.get_folder_items,
+                folder_id=folder_id,
+            )
             files = []
             for item in items.entries:
                 if item.type == "file":
@@ -306,7 +314,10 @@ class BoxClient:
             if due_at:
                 task_body["due_at"] = due_at
 
-            task = self.client.tasks.create_task(**task_body)
+            task = await asyncio.to_thread(
+                self.client.tasks.create_task,
+                **task_body,
+            )
             logger.info(f"Created task on file {file_id} -> {task.id}")
             return task.id
         except Exception as e:
@@ -331,7 +342,8 @@ class BoxClient:
             return True
 
         try:
-            self.client.tasks.create_task_assignment(
+            await asyncio.to_thread(
+                self.client.tasks.create_task_assignment,
                 task_id=task_id,
                 assign_to={"login": user_email},
             )
@@ -365,7 +377,8 @@ class BoxClient:
             return True
 
         try:
-            self.client.file_metadata.create_file_metadata_by_id(
+            await asyncio.to_thread(
+                self.client.file_metadata.create_file_metadata_by_id,
                 file_id=file_id,
                 scope=scope,
                 template_key=template_key,
@@ -380,7 +393,8 @@ class BoxClient:
                     {"op": "replace", "path": f"/{key}", "value": value}
                     for key, value in metadata.items()
                 ]
-                self.client.file_metadata.update_file_metadata_by_id(
+                await asyncio.to_thread(
+                    self.client.file_metadata.update_file_metadata_by_id,
                     file_id=file_id,
                     scope=scope,
                     template_key=template_key,
