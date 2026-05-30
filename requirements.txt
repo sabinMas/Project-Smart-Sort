@@ -4,14 +4,14 @@ uvicorn[standard]==0.27.0
 python-multipart==0.0.6
 
 # Box SDK
-box-sdk-gen==0.24.0
+box-sdk-gen==1.17.0
 
 # LLM Providers
 anthropic==0.25.1
 
 # Email & Webhooks
 sendgrid==6.11.0
-postmark==0.11.0
+postmark==1.0.0
 pydantic==2.6.1
 pydantic-settings==2.1.0
 

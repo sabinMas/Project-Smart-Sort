@@ -2,13 +2,14 @@
 
 from typing import Dict, Any
 from abc import ABC, abstractmethod
-from backend.shared.config import Config, LLMProvider
+from backend.shared.config import Config, LLMProvider as LLMProviderEnum
 from backend.shared.logging import get_logger
+from backend.shared.errors import LLMProviderError
 
 logger = get_logger(__name__)
 
 
-class LLMProvider(ABC):
+class BaseLLMProvider(ABC):
     """Abstract base class for LLM providers."""
 
     @abstractmethod
@@ -29,7 +30,7 @@ class LLMProvider(ABC):
         raise NotImplementedError()
 
 
-class CerebasProvider(LLMProvider):
+class CerebasProvider(BaseLLMProvider):
     """Cerebras Llama 3.1 8B provider."""
 
     async def call(self, system_prompt: str, user_prompt: str) -> str:
@@ -44,10 +45,45 @@ class CerebasProvider(LLMProvider):
 
         Use model: "llama-3.1-8b"
         """
-        raise NotImplementedError("TODO: Implement Cerebras provider")
+        try:
+            from cerebras.cloud.sdk import Cerebras
+
+            # 1. Initialize Cerebras client with API key
+            client = Cerebras(api_key=Config.CEREBRAS_API_KEY)
+
+            # 2. Call Llama 3.1 8B model
+            response = client.messages.create(
+                model="llama-3.1-8b",
+                system=system_prompt,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": user_prompt,
+                    }
+                ],
+            )
+
+            # 3. Parse JSON response
+            content = response.content[0].text if response.content else ""
+
+            logger.debug(f"Cerebras response: {content[:200]}...")
+
+            # 4. Validate response format (should be JSON)
+            # The response should be JSON, but we'll validate in the service layer
+
+            # 5. Return JSON string
+            return content
+
+        except ImportError:
+            raise LLMProviderError(
+                "Cerebras SDK not installed. Install with: pip install cerebras-sdk"
+            )
+        except Exception as e:
+            logger.error(f"Cerebras API error: {str(e)}")
+            raise LLMProviderError(f"Cerebras API call failed: {str(e)}")
 
 
-class GroqProvider(LLMProvider):
+class GroqProvider(BaseLLMProvider):
     """Groq LLM provider (fallback)."""
 
     async def call(self, system_prompt: str, user_prompt: str) -> str:
@@ -60,10 +96,46 @@ class GroqProvider(LLMProvider):
         4. Validate response format
         5. Return JSON string
         """
-        raise NotImplementedError("TODO: Implement Groq provider")
+        try:
+            from groq import Groq
+
+            # 1. Initialize Groq client with API key
+            client = Groq(api_key=Config.GROQ_API_KEY)
+
+            # 2. Call LLM model
+            response = client.chat.completions.create(
+                model="mixtral-8x7b-32768",
+                system=system_prompt,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": user_prompt,
+                    }
+                ],
+                temperature=0.3,
+            )
+
+            # 3. Parse JSON response
+            content = response.choices[0].message.content if response.choices else ""
+
+            logger.debug(f"Groq response: {content[:200]}...")
+
+            # 4. Validate response format (should be JSON)
+            # The response should be JSON, but we'll validate in the service layer
+
+            # 5. Return JSON string
+            return content
+
+        except ImportError:
+            raise LLMProviderError(
+                "Groq SDK not installed. Install with: pip install groq"
+            )
+        except Exception as e:
+            logger.error(f"Groq API error: {str(e)}")
+            raise LLMProviderError(f"Groq API call failed: {str(e)}")
 
 
-class GeminiProvider(LLMProvider):
+class GeminiProvider(BaseLLMProvider):
     """Google Gemini provider (fallback)."""
 
     async def call(self, system_prompt: str, user_prompt: str) -> str:
@@ -76,7 +148,34 @@ class GeminiProvider(LLMProvider):
         4. Validate response format
         5. Return JSON string
         """
-        raise NotImplementedError("TODO: Implement Gemini provider")
+        try:
+            import google.generativeai as genai
+
+            # 1. Initialize Gemini client with API key
+            genai.configure(api_key=Config.GEMINI_API_KEY)
+            model = genai.GenerativeModel("gemini-pro", system_instruction=system_prompt)
+
+            # 2. Call Gemini model
+            response = model.generate_content(user_prompt)
+
+            # 3. Parse JSON response
+            content = response.text if response else ""
+
+            logger.debug(f"Gemini response: {content[:200]}...")
+
+            # 4. Validate response format (should be JSON)
+            # The response should be JSON, but we'll validate in the service layer
+
+            # 5. Return JSON string
+            return content
+
+        except ImportError:
+            raise LLMProviderError(
+                "Google Generative AI SDK not installed. Install with: pip install google-generativeai"
+            )
+        except Exception as e:
+            logger.error(f"Gemini API error: {str(e)}")
+            raise LLMProviderError(f"Gemini API call failed: {str(e)}")
 
 
 class LLMRouter:
@@ -87,23 +186,23 @@ class LLMRouter:
         self.provider_name = Config.LLM_PROVIDER
         self.provider = self._get_provider()
 
-    def _get_provider(self) -> LLMProvider:
+    def _get_provider(self) -> BaseLLMProvider:
         """
         Get LLM provider instance based on configuration.
 
         Returns:
-            LLMProvider: The selected provider
+            BaseLLMProvider: The selected provider
 
         Raises:
             ConfigurationError: If provider is not supported
         """
-        if self.provider_name == LLMProvider.CEREBRAS:
+        if self.provider_name == LLMProviderEnum.CEREBRAS:
             logger.info("Using Cerebras provider")
             return CerebasProvider()
-        elif self.provider_name == LLMProvider.GROQ:
+        elif self.provider_name == LLMProviderEnum.GROQ:
             logger.info("Using Groq provider")
             return GroqProvider()
-        elif self.provider_name == LLMProvider.GEMINI:
+        elif self.provider_name == LLMProviderEnum.GEMINI:
             logger.info("Using Gemini provider")
             return GeminiProvider()
         else:
