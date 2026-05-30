@@ -209,6 +209,7 @@ class BoxClient:
             return folder_id
 
         # Live mode: traverse/create path
+        # Use the Project-Smart-Sort demo folder as the root (not Box root "0")
         parent_id = parent_id or Config.BOX_DEMO_FOLDER_ID or "0"
         parts = [p for p in folder_path.split("/") if p]
 
