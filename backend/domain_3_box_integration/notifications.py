@@ -188,6 +188,7 @@ class NotificationManager:
         """Format a numeric amount as a currency value.
 
         Coerces via float() to tolerate ints or numeric strings.
+        Returns empty string if amount is None or invalid.
 
         Args:
             amount: Numeric amount
@@ -195,7 +196,12 @@ class NotificationManager:
         Returns:
             str: Currency string with thousands separators, e.g. "$15,500.00"
         """
-        return f"${float(amount):,.2f}"
+        if amount is None:
+            return ""
+        try:
+            return f"${float(amount):,.2f}"
+        except (TypeError, ValueError):
+            return str(amount)
 
     def _build_slack_message(
         self,
@@ -224,7 +230,10 @@ class NotificationManager:
         button_url = f"https://app.box.com/file/{box_file_id}"
 
         # Urgency decision (Req 1.7, 1.8)
-        amount = meta.get("amount")
+        try:
+            amount = float(meta["amount"]) if meta.get("amount") is not None else None
+        except (TypeError, ValueError):
+            amount = None
         is_urgent = doc_type == "invoice" and amount is not None and amount > 10000
         emoji = "🚨" if is_urgent else "📄"
 
