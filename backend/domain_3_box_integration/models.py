@@ -39,7 +39,7 @@ class SendForSignatureResponse(BaseModel):
     docusign_envelope_id: str
     status: str
     recipients_sent_to: int
-    expires_at: datetime
+    expires_at: str  # ISO format datetime string
 
 
 class SignatureStatusResponse(BaseModel):
