@@ -35,6 +35,7 @@ app.add_middleware(
 )
 
 INBOX_POLL_INTERVAL = 60  # seconds between inbox checks
+_poller_task = None  # hold reference so GC doesn't destroy it
 
 
 async def _process_inbox_once():
@@ -176,9 +177,10 @@ async def startup():
             logger.error(f"Failed to connect to database: {e}")
             raise
 
-    # Start background inbox poller
+    # Start background inbox poller — store reference to prevent GC destruction
+    global _poller_task
     if Config.BOX_INBOX_FOLDER_ID:
-        asyncio.create_task(_inbox_poller())
+        _poller_task = asyncio.create_task(_inbox_poller())
         logger.info(
             f"Inbox poller started — checking every {INBOX_POLL_INTERVAL}s "
             f"(folder {Config.BOX_INBOX_FOLDER_ID})"
