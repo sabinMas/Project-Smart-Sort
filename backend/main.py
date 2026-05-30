@@ -54,14 +54,18 @@ async def _process_inbox_once():
 
     box_client = BoxClient()
 
+    logger.info(f"Inbox poll: checking folder {inbox_folder_id} (demo_mode={Config.DEMO_MODE})")
+
     try:
         files = await box_client.list_files(inbox_folder_id)
+        logger.info(f"Inbox poll: list_files returned {len(files)} item(s): {[f['name'] for f in files]}")
     except Exception as e:
         logger.warning(f"Inbox poll: could not list files: {e}")
         return
 
     pdfs = [f for f in files if f["name"].lower().endswith(".pdf")]
     if not pdfs:
+        logger.info(f"Inbox poll: no PDFs found in {len(files)} item(s)")
         return
 
     logger.info(f"Inbox poll: found {len(pdfs)} PDF(s) to sort")
