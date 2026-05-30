@@ -1,6 +1,9 @@
 """FastAPI routes for Domain 3 (Approvals, Signatures & Orchestration)."""
 
+import hashlib
+import hmac
 import logging
+import base64
 from fastapi import APIRouter, HTTPException, Request
 from .models import (
     ApprovalRequest,
@@ -152,6 +155,124 @@ async def handle_docusign_webhook(request: Request) -> dict:
     except Exception as e:
         logger.error(f"Error handling DocuSign webhook: {e}")
         return {"status": "error", "detail": str(e)}
+
+
+@router.post("/webhooks/box", tags=["webhooks"])
+async def handle_box_webhook(request: Request) -> dict:
+    """Handle Box webhook events - FILE.UPLOADED triggers auto-classify and sort.
+
+    Box sends this when a file is uploaded to a watched folder (e.g. Inbox).
+    We download the file, classify it, then move it to the correct folder.
+
+    Setup in Box Developer Console:
+      Trigger: FILE.UPLOADED
+      URL: https://project-smart-sort.onrender.com/webhooks/box
+    """
+    from backend.shared.config import Config
+    from backend.shared.types import IngestedDocument
+    from backend.orchestration import get_orchestrator
+    from .box_client import BoxClient
+
+    # Verify Box webhook signature
+    primary_key   = Config.WEBHOOK_PRIMARY_KEY
+    secondary_key = Config.WEBHOOK_SECONDARY_KEY
+
+    body_bytes = await request.body()
+
+    def _valid_sig(key: str) -> bool:
+        sig = hmac.new(key.encode(), body_bytes, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(
+            sig,
+            request.headers.get("box-signature-primary", "")
+            or request.headers.get("box-signature-secondary", ""),
+        )
+
+    if primary_key and not _valid_sig(primary_key):
+        if secondary_key and not _valid_sig(secondary_key):
+            raise HTTPException(status_code=401, detail="Invalid Box webhook signature")
+
+    try:
+        body = __import__("json").loads(body_bytes)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    trigger = body.get("trigger", "")
+    source  = body.get("source", {})
+
+    logger.info(f"Box webhook received: trigger={trigger}")
+
+    # Only process FILE.UPLOADED events
+    if trigger != "FILE.UPLOADED":
+        return {"status": "ignored", "trigger": trigger}
+
+    file_id   = source.get("id")
+    file_name = source.get("name", "document.pdf")
+
+    if not file_id:
+        raise HTTPException(status_code=400, detail="Missing file ID in webhook")
+
+    # Only process PDFs
+    if not file_name.lower().endswith(".pdf"):
+        logger.info(f"Skipping non-PDF file: {file_name}")
+        return {"status": "ignored", "reason": "not a PDF"}
+
+    logger.info(f"Processing uploaded file: {file_name} (id={file_id})")
+
+    # Download file bytes from Box
+    box_client = BoxClient()
+    try:
+        file_bytes = await box_client.download_file(file_id)
+    except Exception as e:
+        logger.error(f"Failed to download file {file_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Could not download file: {e}")
+
+    # Extract text for classification (use Textract / pdfplumber)
+    from backend.domain_1_email.textract_parser import get_textract_parser
+    textract = get_textract_parser()
+    extracted_text = await textract.extract_pdf_text(file_bytes, file_name)
+
+    if not extracted_text:
+        # Fallback to pdfplumber
+        try:
+            import io
+            import pdfplumber
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                extracted_text = "\n".join(
+                    p.extract_text() or "" for p in pdf.pages
+                )
+        except Exception:
+            extracted_text = f"[Could not extract text from {file_name}]"
+
+    # Build IngestedDocument and run full pipeline
+    document = IngestedDocument(
+        filename=file_name,
+        content=extracted_text,
+        content_type="application/pdf",
+        source="box_file_request",
+        raw_file_bytes=file_bytes,
+    )
+
+    orchestrator = get_orchestrator()
+    result = await orchestrator.process_ingested_document(document)
+
+    # Move the already-uploaded file to the correct folder
+    if result and result.box_file_id and result.destination_folder:
+        try:
+            dest_folder_id = await box_client.get_or_create_folder(
+                result.destination_folder
+            )
+            await box_client.move_file(file_id, dest_folder_id)
+            logger.info(f"Moved {file_name} → {result.destination_folder}")
+        except Exception as e:
+            logger.warning(f"Could not move file after classification: {e}")
+
+    return {
+        "status": "processed",
+        "file_id": file_id,
+        "file_name": file_name,
+        "classification": result.status if result else "unknown",
+        "destination": result.destination_folder if result else None,
+    }
 
 
 @router.get("/documents/{file_id}", tags=["documents"])

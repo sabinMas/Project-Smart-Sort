@@ -290,6 +290,60 @@ class BoxClient:
                 f"Failed to create folder '{folder_name}': {e}"
             )
 
+    async def download_file(self, file_id: str) -> bytes:
+        """Download file content from Box as bytes.
+
+        Args:
+            file_id: Box file ID
+
+        Returns:
+            bytes: File content
+
+        Raises:
+            BoxFileNotFoundError: If file not found
+        """
+        if self._demo_mode:
+            logger.info(f"[DEMO] Downloaded file {file_id}")
+            return b"%PDF-1.4 sample content"
+
+        try:
+            content = await asyncio.to_thread(
+                self.client.downloads.download_file,
+                file_id=file_id,
+            )
+            # content is a generator/stream - read all bytes
+            if hasattr(content, "read"):
+                return content.read()
+            return b"".join(content)
+        except Exception as e:
+            raise BoxFileNotFoundError(f"Failed to download file {file_id}: {e}")
+
+    async def get_file_info(self, file_id: str) -> Dict[str, Any]:
+        """Get file metadata from Box.
+
+        Args:
+            file_id: Box file ID
+
+        Returns:
+            dict with name, size, parent folder info
+        """
+        if self._demo_mode:
+            return {"id": file_id, "name": "sample.pdf", "size": 1024}
+
+        try:
+            file_info = await asyncio.to_thread(
+                self.client.files.get_file_by_id,
+                file_id=file_id,
+            )
+            return {
+                "id": file_info.id,
+                "name": file_info.name,
+                "size": file_info.size,
+                "parent_id": file_info.parent.id if file_info.parent else None,
+            }
+        except Exception as e:
+            raise BoxFileNotFoundError(f"Failed to get file info {file_id}: {e}")
+
     async def list_files(self, folder_id: str) -> List[Dict[str, Any]]:
         """List files in a Box folder.
 
