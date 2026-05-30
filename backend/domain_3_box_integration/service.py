@@ -89,11 +89,22 @@ class BoxIntegrationService:
             )
 
             # Step 5: Send notifications
+            extracted = classification_result.extracted_fields or {}
+            notif_metadata = {
+                "confidence": classification_result.confidence,
+                "box_file_id": file_id,
+            }
+            if "vendor" in extracted:
+                notif_metadata["vendor"] = extracted["vendor"]
+            if "amount" in extracted:
+                notif_metadata["amount"] = extracted["amount"]
+
             notified = await self.notification_manager.send_notifications(
                 document_id=document_id,
                 doc_type=doc_type,
                 assigned_to_email=reviewer_email or "",
                 channels=["slack", "email"],
+                metadata=notif_metadata,
             )
 
             result = ProcessingResult(

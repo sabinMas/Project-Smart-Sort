@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import { ClassificationDisplay } from './components/ClassificationDisplay';
+import { WorkflowStatus } from './components/WorkflowStatus';
 import { TaskAssignment } from './components/TaskAssignment';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorMessage } from './components/ErrorMessage';
@@ -105,38 +106,7 @@ export const App: React.FC = () => {
               confidence={classification.confidence}
             />
 
-            {processingResult && (
-              <div className="processing-result">
-                <h3>Processing Status</h3>
-                <div className={`status-badge status-${processingResult.status}`}>
-                  {processingResult.status.toUpperCase()}
-                </div>
-
-                {processingResult.status === 'success' && (
-                  <>
-                    <p>
-                      <strong>File Location:</strong> {processingResult.destination_folder}
-                    </p>
-                    {processingResult.assigned_to && (
-                      <p>
-                        <strong>Assigned to:</strong> {processingResult.assigned_to}
-                      </p>
-                    )}
-                    {processingResult.notification_sent_to.length > 0 && (
-                      <p>
-                        <strong>Notifications sent:</strong> {processingResult.notification_sent_to.join(', ')}
-                      </p>
-                    )}
-                  </>
-                )}
-
-                {processingResult.status === 'failure' && processingResult.error_message && (
-                  <p className="error-details">
-                    <strong>Error:</strong> {processingResult.error_message}
-                  </p>
-                )}
-              </div>
-            )}
+            {processingResult && <WorkflowStatus processingResult={processingResult} />}
 
             {classification.required_reviewer && (
               <TaskAssignment

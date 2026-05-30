@@ -73,3 +73,19 @@ class DocumentStatusResponse(BaseModel):
     box_folder: str
     signature_status: Optional[SignatureStatusResponse] = None
     approvals: List[ApprovalHistoryModel]
+
+
+class CreateTaskRequest(BaseModel):
+    """Request body for POST /tasks/create (extension sidebar task assignment)."""
+
+    file_id: str
+    assigned_to: EmailStr
+    due_date: Optional[str] = None
+    message: Optional[str] = None
+
+
+class CreateTaskResponse(BaseModel):
+    """Response for POST /tasks/create."""
+
+    task_id: str
+    status: str

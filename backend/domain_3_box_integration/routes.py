@@ -12,8 +12,12 @@ from .models import (
     SendForSignatureResponse,
     SignatureStatusResponse,
     DocumentStatusResponse,
+    CreateTaskRequest,
+    CreateTaskResponse,
 )
 from .approval_service import ApprovalService, SignatureService, DocumentService
+from .tasks import TaskManager
+from .box_client import BoxClient
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -22,6 +26,7 @@ router = APIRouter()
 _approval_service = ApprovalService()
 _signature_service = SignatureService()
 _document_service = DocumentService()
+_task_manager = TaskManager(BoxClient())
 
 
 @router.post("/api/approvals/review", response_model=ApprovalResponse, tags=["approvals"])
@@ -58,6 +63,22 @@ async def review_document(request: ApprovalRequest) -> ApprovalResponse:
         )
     except Exception as e:
         logger.error(f"Error processing approval for {request.document_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/tasks/create", response_model=CreateTaskResponse, tags=["tasks"])
+async def create_task(request: CreateTaskRequest) -> CreateTaskResponse:
+    """Create and assign a Box review task from the extension sidebar."""
+    try:
+        task_id = await _task_manager.create_review_task(
+            file_id=request.file_id,
+            doc_type="document",
+            assigned_to_email=str(request.assigned_to),
+            due_date=request.due_date,
+        )
+        return CreateTaskResponse(task_id=task_id, status="created")
+    except Exception as e:
+        logger.error(f"Error creating task for file {request.file_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

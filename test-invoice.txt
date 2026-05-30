@@ -1,0 +1,27 @@
+INVOICE
+
+Invoice Number: INV-2024-001
+Date: May 30, 2024
+Due Date: June 30, 2024
+
+Bill To:
+Acme Corporation
+123 Main Street
+Seattle, WA 98101
+
+Description                          Amount
+-----------------------------------------
+Software Development Services        $5,000.00
+Cloud Infrastructure Setup           $1,200.00
+AI Classification Module             $2,500.00
+
+Subtotal:                            $8,700.00
+Tax (10%):                             $870.00
+Total Due:                           $9,570.00
+
+Payment Terms: Net 30
+Bank: First National Bank
+Account: 1234567890
+Routing: 987654321
+
+Thank you for your business.
