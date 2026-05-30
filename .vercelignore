@@ -1,0 +1,12 @@
+requirements.txt
+setup.py
+backend/
+.env
+.env.example
+DOMAIN_*.md
+README*.md
+TODO.md
+DEMO*.md
+AGENT*.md
+CHAT*.md
+*.md
