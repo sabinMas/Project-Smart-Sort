@@ -241,13 +241,9 @@ class NotificationManager:
         if "amount" in meta:
             lines.append(f"Amount: {self._format_currency(meta['amount'])}")
 
-        button = {
-            "type": "button",
-            "text": {"type": "plain_text", "text": "Review in Box"},
-            "url": button_url,
-        }
-        if is_urgent:
-            button["style"] = "danger"  # Slack only honors primary/danger
+        # Use plain link in text instead of interactive button
+        # (avoids needing Slack interactivity configured)
+        lines.append(f"<{button_url}|📂 Review in Box>")
 
         return {
             "text": f"{emoji} New {doc_type} document for review",
@@ -255,10 +251,6 @@ class NotificationManager:
                 {
                     "type": "section",
                     "text": {"type": "mrkdwn", "text": "\n".join(lines)},
-                },
-                {
-                    "type": "actions",
-                    "elements": [button],
                 },
             ],
         }
