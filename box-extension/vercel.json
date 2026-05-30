@@ -1,6 +1,7 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "rootDirectory": "box-extension",
   "env": {
     "VITE_ENVIRONMENT": "production"
   },
