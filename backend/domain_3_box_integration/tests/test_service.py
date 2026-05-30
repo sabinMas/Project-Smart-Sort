@@ -2,7 +2,7 @@
 
 import os
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import patch, AsyncMock, MagicMock
 
 from backend.shared.types import ClassificationResult, ProcessingResult
@@ -147,7 +147,7 @@ class TestBoxIntegrationService:
     async def test_date_subfolder_for_invoices(self, service):
         """Test that invoices get year/month subfolders."""
         path = service._get_destination_path("invoice")
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         assert f"/{now.year}/" in path
         assert now.strftime("%B") in path
