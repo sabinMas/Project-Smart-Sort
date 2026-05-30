@@ -36,6 +36,9 @@ app.add_middleware(
 async def startup():
     """Initialize database connection on startup."""
     logger.info("Starting Box Smart Inbox application")
+    if Config.DEMO_MODE:
+        logger.info("DEMO_MODE enabled - skipping database connection")
+        return
     try:
         await db.connect()
         logger.info("Database connected successfully")
@@ -48,8 +51,9 @@ async def startup():
 async def shutdown():
     """Close database connection on shutdown."""
     logger.info("Shutting down Box Smart Inbox application")
-    await db.disconnect()
-    logger.info("Database disconnected")
+    if not Config.DEMO_MODE:
+        await db.disconnect()
+        logger.info("Database disconnected")
 
 
 # Include domain routers

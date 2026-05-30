@@ -3,6 +3,13 @@
 import os
 from typing import Literal
 from enum import Enum
+from pathlib import Path
+
+# Load .env file if it exists
+from dotenv import load_dotenv
+env_path = Path(__file__).parent.parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
 
 
 class LLMProvider(str, Enum):
