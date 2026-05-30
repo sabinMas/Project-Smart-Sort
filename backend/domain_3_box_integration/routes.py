@@ -334,7 +334,7 @@ async def handle_box_webhook(request: Request) -> dict:
     except Exception as e:
         logger.warning(f"Task creation failed (non-fatal): {e}")
 
-    # Step 7: Send Slack notification
+    # Step 7: Send Slack notification with real Box file ID so the link works
     try:
         notif = NotificationManager()
         await notif.send_notifications(
@@ -342,6 +342,12 @@ async def handle_box_webhook(request: Request) -> dict:
             doc_type=classification.doc_type,
             assigned_to_email=reviewer_email if task_id else "",
             channels=["slack"],
+            metadata={
+                "box_file_id": file_id,  # real Box numeric ID → correct link
+                "confidence": classification.confidence,
+                "vendor": classification.extracted_fields.get("vendor", ""),
+                "amount": classification.extracted_fields.get("amount"),
+            },
         )
     except Exception as e:
         logger.warning(f"Notification failed (non-fatal): {e}")
@@ -469,6 +475,24 @@ async def process_inbox() -> dict:
                     file_id=file_id,
                     doc_type=classification.doc_type,
                     assigned_to_email=reviewer_email,
+                )
+            except Exception:
+                pass
+
+            # Send Slack notification with real Box file ID
+            try:
+                notif = NotificationManager()
+                await notif.send_notifications(
+                    document_id=document.id,
+                    doc_type=classification.doc_type,
+                    assigned_to_email=reviewer_email or "",
+                    channels=["slack"],
+                    metadata={
+                        "box_file_id": file_id,
+                        "confidence": classification.confidence,
+                        "vendor": classification.extracted_fields.get("vendor", ""),
+                        "amount": classification.extracted_fields.get("amount"),
+                    },
                 )
             except Exception:
                 pass
