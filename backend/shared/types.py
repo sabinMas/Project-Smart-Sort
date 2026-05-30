@@ -96,6 +96,79 @@ class ClassificationResult:
 
 
 @dataclass
+class ContactVerification:
+    """
+    Contact verification result with layered evidence.
+    Output of Domain 2 contact resolution layer.
+    """
+
+    email: str
+    name: Optional[str] = None
+    company: Optional[str] = None
+    verification_score: int = 0  # 0-100
+    verified: bool = False
+    source: Literal["email_from", "email_to", "extracted_from_doc", "manual"] = "extracted_from_doc"
+    last_contact: Optional[datetime] = None
+    evidence: dict = field(default_factory=dict)  # {from_document, from_contact_db, from_email_header}
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "email": self.email,
+            "name": self.name,
+            "company": self.company,
+            "verification_score": self.verification_score,
+            "verified": self.verified,
+            "source": self.source,
+            "last_contact": self.last_contact.isoformat() if self.last_contact else None,
+            "evidence": self.evidence,
+        }
+
+
+@dataclass
+class SignatureStateRecipient:
+    """Single recipient's signature state."""
+
+    email: str
+    name: Optional[str] = None
+    status: Literal["pending", "sent", "opened", "signed", "declined", "voided"] = "pending"
+    signed_at: Optional[datetime] = None
+    docusign_id: Optional[str] = None
+
+
+@dataclass
+class SignatureState:
+    """
+    Signature tracking state for a document.
+    Owned by Domain 3, updated by DocuSign webhooks.
+    """
+
+    document_id: str
+    recipients: list = field(default_factory=list)  # List[SignatureStateRecipient]
+    signed_count: int = 0
+    total_count: int = 0
+    docusign_envelope_id: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    all_signed_at: Optional[datetime] = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "document_id": self.document_id,
+            "recipients": [r.__dict__ if hasattr(r, '__dict__') else r for r in self.recipients],
+            "signed_count": self.signed_count,
+            "total_count": self.total_count,
+            "docusign_envelope_id": self.docusign_envelope_id,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "all_signed_at": self.all_signed_at.isoformat() if self.all_signed_at else None,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+
+@dataclass
 class ProcessingResult:
     """
     Output of Domain 3 (Box Integration).

@@ -1,1 +1,1 @@
-"""Tests for Domain 2: AI Classification."""
+"""Tests for Domain 2."""

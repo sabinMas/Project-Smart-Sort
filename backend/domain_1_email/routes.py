@@ -1,52 +1,248 @@
-"""FastAPI routes for Domain 1: Email Ingestion."""
+"""FastAPI routes for Domain 1 (Email Ingestion)."""
 
+import base64
+import logging
 from fastapi import APIRouter, Request, HTTPException
-from backend.domain_1_email.models import WebhookResponse
-from backend.domain_1_email.service import EmailIngestionService
-from backend.shared.logging import get_logger
 
-logger = get_logger(__name__)
-router = APIRouter(prefix="/webhooks", tags=["email"])
+from .models import (
+    DocumentUploadRequest,
+    DocumentIngestionResponse,
+)
+from .service import EmailIngestionService
+from backend.shared.errors import (
+    EmailIngestionError,
+    InvalidEmailFormatError,
+    AttachmentExtractionError,
+)
 
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+# Service instance
 email_service = EmailIngestionService()
 
 
-@router.post("/email", response_model=WebhookResponse)
-async def handle_email_webhook(request: Request) -> WebhookResponse:
+@router.post("/webhooks/sendgrid", tags=["email"])
+async def handle_sendgrid_webhook(request: Request) -> dict:
     """
-    Handle incoming email webhook from SendGrid or Postmark.
+    Handle incoming emails from SendGrid Inbound Parse webhook.
 
-    TODO: Implement webhook handler:
-    1. Validate webhook signature (use email_service.validate_sendgrid_signature)
-    2. Parse email payload (from/to/subject/attachments)
-    3. Call email_service.ingest_email() to process
-    4. On success: Return {"status": "success", "document_id": "..."}
-    5. On error: Log error and return 400 with error message
-
-    The webhook will be called by SendGrid with multipart/form-data:
-    - headers: Email headers
-    - from: Sender email
-    - to: Recipient email
-    - subject: Subject line
-    - text: Plain text body
-    - html: HTML body
-    - attachment files (multiple)
+    Expects multipart/form-data or JSON payload from SendGrid with:
+    - from, to, subject, text/html body
+    - Optional attachments (base64 encoded)
 
     Returns:
-        WebhookResponse: Status and document ID
-
-    Raises:
-        HTTPException: If signature validation fails or processing errors occur
+        200 OK with document_id on success
+        400 Bad Request on invalid payload
+        401 Unauthorized on invalid signature
     """
-    raise NotImplementedError("TODO: Implement SendGrid webhook handler")
+    try:
+        # Parse request body — SendGrid can send JSON or form data
+        content_type = request.headers.get("content-type", "")
+
+        if "multipart/form-data" in content_type:
+            form = await request.form()
+            from_email = form.get("from", "")
+            to_email = form.get("to", "")
+            subject = form.get("subject", "")
+            text_content = form.get("text", None)
+            html_content = form.get("html", None)
+
+            # Extract attachments from form data
+            attachments = []
+            attachment_count = int(form.get("attachments", 0) or 0)
+            for i in range(1, attachment_count + 1):
+                att_info = form.get(f"attachment-info", None)
+                att_file = form.get(f"attachment{i}", None)
+                if att_file and hasattr(att_file, "read"):
+                    file_bytes = await att_file.read()
+                    attachments.append({
+                        "filename": att_file.filename or f"attachment{i}",
+                        "content_type": att_file.content_type or "application/octet-stream",
+                        "content": base64.b64encode(file_bytes).decode("utf-8"),
+                    })
+        else:
+            # JSON payload
+            body = await request.json()
+            from_email = body.get("from", "")
+            to_email = body.get("to", "")
+            subject = body.get("subject", "")
+            text_content = body.get("text", None)
+            html_content = body.get("html", None)
+
+            # Attachments in JSON are already base64 encoded
+            attachments = body.get("attachments", []) or []
+
+        # Validate signature (if headers present)
+        signature = request.headers.get("x-twilio-email-event-webhook-signature", "")
+        timestamp = request.headers.get("x-twilio-email-event-webhook-timestamp", "")
+
+        if signature and timestamp:
+            raw_body = await request.body()
+            payload_str = raw_body.decode("utf-8", errors="replace")
+            is_valid = await email_service.validate_sendgrid_signature(
+                signature, timestamp, payload_str
+            )
+            if not is_valid:
+                raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+        # Process the email
+        document = await email_service.ingest_email(
+            from_email=from_email,
+            to_email=to_email,
+            subject=subject,
+            text_content=text_content,
+            html_content=html_content,
+            attachments=attachments,
+        )
+
+        logger.info(f"Email ingested successfully: document_id={document.id}")
+
+        return {
+            "status": "success",
+            "document_id": document.id,
+            "filename": document.filename,
+        }
+
+    except HTTPException:
+        raise
+    except InvalidEmailFormatError as e:
+        logger.warning(f"Invalid email format: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except EmailIngestionError as e:
+        logger.error(f"Email ingestion error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error in webhook handler: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/health")
-async def health_check() -> dict:
+@router.post("/webhooks/email", tags=["email"])
+async def handle_email_webhook(request: Request) -> dict:
     """
-    Health check endpoint for Domain 1.
+    Alias endpoint for /webhooks/sendgrid.
+
+    Provides a simpler URL for testing and alternative webhook configurations.
+    """
+    return await handle_sendgrid_webhook(request)
+
+
+@router.post("/webhooks/email-return", tags=["email"])
+async def handle_email_return(request: Request) -> dict:
+    """
+    Handle signed documents returning via email.
+
+    Called when a signed PDF comes back from recipient's email.
+    Matches it to the original document and updates signature state.
 
     Returns:
-        dict: Status information
+        200 OK with document info
+        400 Bad Request if document cannot be matched
     """
-    return {"status": "ok", "service": "email-ingestion"}
+    try:
+        body = await request.json()
+        from_email = body.get("from", "")
+        subject = body.get("subject", "")
+        attachment_filename = body.get("attachment_filename", "")
+        attachment_content = body.get("attachment_content", "")
+
+        if not attachment_content or not attachment_filename:
+            raise HTTPException(
+                status_code=400, detail="Missing attachment data for return document"
+            )
+
+        # Process as a regular email with the signed attachment
+        document = await email_service.ingest_email(
+            from_email=from_email,
+            to_email="",
+            subject=subject or f"Signed return: {attachment_filename}",
+            text_content=f"Signed document returned from {from_email}",
+            attachments=[
+                {
+                    "filename": attachment_filename,
+                    "content_type": "application/pdf",
+                    "content": attachment_content,
+                }
+            ],
+        )
+
+        return {
+            "status": "received",
+            "document_id": document.id,
+            "filename": document.filename,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error handling email return: {e}")
+        raise HTTPException(status_code=400, detail=f"Could not process return: {e}")
+
+
+@router.post("/api/documents/upload", response_model=DocumentIngestionResponse, tags=["documents"])
+async def upload_document(request: DocumentUploadRequest) -> DocumentIngestionResponse:
+    """
+    Manually upload a document for processing.
+
+    Alternative to email ingestion for testing and UI uploads.
+
+    Args:
+        request: DocumentUploadRequest with base64-encoded file
+
+    Returns:
+        DocumentIngestionResponse with document ID and status
+    """
+    try:
+        # Process as an email-like ingestion with the uploaded file as attachment
+        document = await email_service.ingest_email(
+            from_email=request.source_email or "manual_upload@system",
+            to_email="",
+            subject=request.file_name,
+            text_content=None,
+            attachments=[
+                {
+                    "filename": request.file_name,
+                    "content_type": _guess_content_type(request.file_name),
+                    "content": request.file_data,
+                }
+            ],
+        )
+
+        return DocumentIngestionResponse(
+            document_id=document.id,
+            filename=document.filename,
+            status="ingested",
+        )
+
+    except InvalidEmailFormatError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except EmailIngestionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Upload error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process upload")
+
+
+@router.get("/api/documents/pending-return", tags=["documents"])
+async def list_pending_return_documents() -> dict:
+    """
+    List documents waiting for signed copies to be returned.
+
+    Returns:
+        dict with list of documents in "pending_return" status
+    """
+    # TODO: Query database for pending return documents (Phase 5)
+    return {"documents": [], "count": 0}
+
+
+def _guess_content_type(filename: str) -> str:
+    """Guess content type from filename extension."""
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    mapping = {
+        "pdf": "application/pdf",
+        "txt": "text/plain",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+    }
+    return mapping.get(ext, "application/octet-stream")

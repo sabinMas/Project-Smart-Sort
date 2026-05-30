@@ -6,9 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.shared.config import Config
 from backend.shared.logging import setup_logging
 from backend.shared.types import IngestedDocument, ProcessingResult
-from backend.domain_1_email.routes import router as email_router
-from backend.domain_2_classifier.service import ClassificationService
-from backend.domain_3_box_integration.service import BoxIntegrationService
+from backend.shared.database import db
+from backend.domain_1_email import routes as domain1_routes
+from backend.domain_2_classifier import routes as domain2_routes
+from backend.domain_3_box_integration import routes as domain3_routes
 
 # Setup logging
 setup_logging(Config.LOG_LEVEL)
@@ -17,8 +18,8 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app
 app = FastAPI(
     title="Box Smart Inbox",
-    description="AI-powered document intake, classification, and routing system",
-    version="0.1.0",
+    description="AI-powered document orchestration with signature tracking",
+    version="1.0.0",
 )
 
 # Add CORS middleware
@@ -30,15 +31,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include domain 1 routes
-app.include_router(email_router)
+# Database startup and shutdown
+@app.on_event("startup")
+async def startup():
+    """Initialize database connection on startup."""
+    logger.info("Starting Box Smart Inbox application")
+    try:
+        await db.connect()
+        logger.info("Database connected successfully")
+    except Exception as e:
+        logger.error(f"Failed to connect to database: {e}")
+        raise
 
-# Initialize services
-classification_service = ClassificationService()
-box_service = BoxIntegrationService()
 
-# Track processing state (in-memory for hackathon)
-documents_processed = []
+@app.on_event("shutdown")
+async def shutdown():
+    """Close database connection on shutdown."""
+    logger.info("Shutting down Box Smart Inbox application")
+    await db.disconnect()
+    logger.info("Database disconnected")
+
+
+# Include domain routers
+app.include_router(domain1_routes.router, tags=["domain-1"])
+app.include_router(domain2_routes.router, tags=["domain-2"])
+app.include_router(domain3_routes.router, tags=["domain-3"])
 
 
 @app.get("/health")
@@ -51,72 +68,36 @@ async def health_check() -> dict:
     }
 
 
-@app.post("/documents/intake", response_model=ProcessingResult)
-async def intake_document(document: IngestedDocument) -> ProcessingResult:
-    """
-    End-to-end document processing orchestration.
-
-    TODO: Implement orchestration:
-    1. Receive IngestedDocument from Domain 1
-    2. Call classification_service.classify(document) → ClassificationResult
-    3. Call box_service.process(classification_result) → ProcessingResult
-    4. Track document in documents_processed list
-    5. Return ProcessingResult
-
-    This is the only place where domains interact with each other.
-    Domain 1 -> Domain 2 -> Domain 3 pipeline.
-
-    Args:
-        document: IngestedDocument from email webhook
-
-    Returns:
-        ProcessingResult: Final result with Box file ID, task, status
-
-    Raises:
-        HTTPException: If processing fails
-    """
-    raise NotImplementedError("TODO: Implement document intake orchestration")
-
-
 @app.get("/status")
 async def get_status() -> dict:
     """
-    Get system status and processing statistics.
+    Get system status and database statistics.
 
     Returns:
-        dict: Status including documents processed, success rate, etc.
+        dict: Status including documents in pipeline, success rate, etc.
     """
-    total = len(documents_processed)
-    successful = sum(1 for d in documents_processed if d.get("status") == "success")
-    success_rate = (successful / total * 100) if total > 0 else 0
+    try:
+        total_docs = await db.fetch_val("SELECT COUNT(*) FROM documents")
+        completed_docs = await db.fetch_val(
+            "SELECT COUNT(*) FROM documents WHERE status = 'complete'"
+        )
+        success_rate = (completed_docs / total_docs * 100) if total_docs > 0 else 0
 
-    return {
-        "status": "operational",
-        "documents_processed": total,
-        "success_rate": f"{success_rate:.1f}%",
-        "recent_documents": documents_processed[-10:] if documents_processed else [],
-    }
-
-
-@app.get("/documents/{document_id}")
-async def get_document_status(document_id: str) -> dict:
-    """
-    Get status of a specific document through the pipeline.
-
-    Args:
-        document_id: ID of document to check
-
-    Returns:
-        dict: Document processing status
-
-    Raises:
-        HTTPException: If document not found
-    """
-    for doc in documents_processed:
-        if doc.get("document_id") == document_id:
-            return doc
-
-    raise HTTPException(status_code=404, detail=f"Document {document_id} not found")
+        return {
+            "status": "operational",
+            "documents_total": total_docs,
+            "documents_completed": completed_docs,
+            "success_rate": f"{success_rate:.1f}%",
+        }
+    except Exception as e:
+        logger.error(f"Error getting status: {e}")
+        return {
+            "status": "operational",
+            "documents_total": 0,
+            "documents_completed": 0,
+            "success_rate": "0.0%",
+            "error": str(e),
+        }
 
 
 if __name__ == "__main__":

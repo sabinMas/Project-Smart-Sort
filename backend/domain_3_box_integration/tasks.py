@@ -1,17 +1,26 @@
 """Task management for Domain 3: Box Integration."""
 
 from typing import Optional
+from backend.shared.config import REVIEWER_MAPPING
+from backend.shared.errors import TaskCreationError
 from backend.shared.logging import get_logger
 
 logger = get_logger(__name__)
+
+# Reviewer role to email mapping (configurable per environment)
+REVIEWER_EMAIL_MAPPING = {
+    "finance": "finance@company.com",
+    "legal": "legal@company.com",
+    "hr": "hr@company.com",
+    "procurement": "procurement@company.com",
+}
 
 
 class TaskManager:
     """Manages Box task creation and assignment."""
 
     def __init__(self, box_client):
-        """
-        Initialize task manager.
+        """Initialize task manager.
 
         Args:
             box_client: BoxClient instance
@@ -25,21 +34,15 @@ class TaskManager:
         assigned_to_email: Optional[str] = None,
         due_date: Optional[str] = None,
     ) -> str:
-        """
-        Create a review task for a document in Box.
+        """Create a review task for a document in Box.
 
-        TODO: Implement task creation:
-        1. Map doc_type to appropriate reviewer (finance, legal, hr, procurement)
-        2. If assigned_to_email not provided, use mapping
-        3. Create Box task on file_id
-        4. Set task message to describe review needed
-        5. Assign to reviewer
-        6. Return task ID
+        Maps doc_type to the appropriate reviewer, creates a task on the file,
+        and assigns it to the reviewer.
 
         Args:
             file_id: Box file ID
             doc_type: Document type (invoice, contract, etc.)
-            assigned_to_email: Email of assigned reviewer (optional)
+            assigned_to_email: Email of assigned reviewer (optional, auto-mapped if None)
             due_date: Due date for task (ISO format, optional)
 
         Returns:
@@ -48,15 +51,42 @@ class TaskManager:
         Raises:
             TaskCreationError: If task creation fails
         """
-        raise NotImplementedError("TODO: Implement task creation")
+        try:
+            # Determine reviewer
+            reviewer_role = self._get_reviewer_for_doc_type(doc_type)
+            reviewer_email = assigned_to_email or self._get_email_for_role(reviewer_role)
+
+            # Build task message
+            message = self._build_task_message(doc_type, reviewer_role)
+
+            # Create task on file
+            task_id = await self.box_client.create_task(
+                file_id=file_id,
+                message=message,
+                due_at=due_date,
+            )
+
+            # Assign to reviewer if we have an email
+            if reviewer_email:
+                await self.box_client.assign_task_to_user(task_id, reviewer_email)
+
+            logger.info(
+                f"Created review task {task_id} for {doc_type} "
+                f"on file {file_id}, assigned to {reviewer_email}"
+            )
+            return task_id
+
+        except Exception as e:
+            raise TaskCreationError(
+                f"Failed to create review task for file {file_id}: {e}"
+            )
 
     async def assign_task(
         self,
         task_id: str,
         assigned_to_email: str,
     ) -> bool:
-        """
-        Assign a task to a specific user.
+        """Assign a task to a specific user.
 
         Args:
             task_id: Box task ID
@@ -68,18 +98,17 @@ class TaskManager:
         Raises:
             TaskCreationError: If assignment fails
         """
-        raise NotImplementedError("TODO: Implement task assignment")
+        try:
+            result = await self.box_client.assign_task_to_user(task_id, assigned_to_email)
+            logger.info(f"Assigned task {task_id} to {assigned_to_email}")
+            return result
+        except Exception as e:
+            raise TaskCreationError(
+                f"Failed to assign task {task_id} to {assigned_to_email}: {e}"
+            )
 
     def _get_reviewer_for_doc_type(self, doc_type: str) -> Optional[str]:
-        """
-        Get reviewer email for document type.
-
-        Maps document types to reviewer roles:
-        - invoice -> finance
-        - contract -> legal
-        - resume -> hr
-        - purchase_order -> procurement
-        - etc.
+        """Get reviewer role for document type.
 
         Args:
             doc_type: Document type
@@ -87,13 +116,33 @@ class TaskManager:
         Returns:
             Optional[str]: Reviewer role or None
         """
-        reviewer_mapping = {
-            "invoice": "finance",
-            "contract": "legal",
-            "resume": "hr",
-            "receipt": "finance",
-            "id_document": "hr",
-            "purchase_order": "procurement",
-            "other": None,
-        }
-        return reviewer_mapping.get(doc_type)
+        return REVIEWER_MAPPING.get(doc_type)
+
+    def _get_email_for_role(self, role: Optional[str]) -> Optional[str]:
+        """Get reviewer email for a role.
+
+        Args:
+            role: Reviewer role (finance, legal, hr, procurement)
+
+        Returns:
+            Optional[str]: Reviewer email or None
+        """
+        if role is None:
+            return None
+        return REVIEWER_EMAIL_MAPPING.get(role)
+
+    def _build_task_message(self, doc_type: str, reviewer_role: Optional[str]) -> str:
+        """Build a descriptive task message.
+
+        Args:
+            doc_type: Document type
+            reviewer_role: Reviewer role
+
+        Returns:
+            str: Task message
+        """
+        role_display = reviewer_role.title() if reviewer_role else "General"
+        return (
+            f"Please review this {doc_type.replace('_', ' ')} document. "
+            f"Assigned to {role_display} team for review and approval."
+        )

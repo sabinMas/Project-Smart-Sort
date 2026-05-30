@@ -1,1 +1,1 @@
-"""Integration tests for Box Smart Inbox."""
+"""Integration tests."""
