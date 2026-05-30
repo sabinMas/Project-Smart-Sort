@@ -14,6 +14,7 @@ from backend.shared.errors import (
 )
 from backend.shared.logging import get_logger
 from backend.shared.types import IngestedDocument
+from .textract_parser import get_textract_parser
 
 logger = get_logger(__name__)
 
@@ -219,7 +220,7 @@ class EmailIngestionService:
 
         Supports:
         - text/plain: Direct decode
-        - application/pdf: PDF text extraction via pdfplumber (fallback to PyPDF2)
+        - application/pdf: PDF text extraction via Amazon Textract (with pdfplumber/PyPDF2 fallback)
         - image/*: Placeholder (OCR not implemented for hackathon)
 
         Args:
@@ -235,7 +236,7 @@ class EmailIngestionService:
                 return raw_bytes.decode("utf-8", errors="replace")
 
             if content_type == "application/pdf":
-                return self._extract_pdf_text(raw_bytes, filename)
+                return await self._extract_pdf_text(raw_bytes, filename)
 
             if content_type.startswith("image/"):
                 # For hackathon: skip OCR, return placeholder
@@ -250,13 +251,34 @@ class EmailIngestionService:
             logger.warning(f"Failed to extract text from {filename}: {e}")
             return f"[Could not extract text from: {filename}]"
 
-    def _extract_pdf_text(self, raw_bytes: bytes, filename: str) -> str:
+    async def _extract_pdf_text(self, raw_bytes: bytes, filename: str) -> str:
         """
         Extract text from PDF bytes.
 
-        Tries pdfplumber first, falls back to PyPDF2.
+        Priority order:
+        1. Amazon Textract (if enabled and credentials available)
+        2. pdfplumber (local, no dependencies)
+        3. PyPDF2 (fallback)
+
+        Args:
+            raw_bytes: Raw PDF file bytes
+            filename: Original filename
+
+        Returns:
+            Extracted text or placeholder string
         """
-        # Try pdfplumber
+        # Try Amazon Textract first
+        try:
+            textract = get_textract_parser()
+            if textract.enabled:
+                logger.info(f"Using Amazon Textract for {filename}")
+                text = await textract.extract_pdf_text(raw_bytes, filename)
+                if text:
+                    return text
+        except Exception as e:
+            logger.warning(f"Textract extraction failed for {filename}, falling back: {e}")
+
+        # Fallback to pdfplumber
         try:
             import pdfplumber
 
@@ -267,13 +289,14 @@ class EmailIngestionService:
                     if page_text:
                         pages_text.append(page_text)
                 if pages_text:
+                    logger.info(f"Extracted {len(pages_text)} pages using pdfplumber from {filename}")
                     return "\n\n".join(pages_text)
         except ImportError:
             logger.debug("pdfplumber not available, trying PyPDF2")
         except Exception as e:
             logger.warning(f"pdfplumber failed for {filename}: {e}")
 
-        # Fallback to PyPDF2
+        # Final fallback to PyPDF2
         try:
             from PyPDF2 import PdfReader
 
@@ -284,6 +307,7 @@ class EmailIngestionService:
                 if page_text:
                     pages_text.append(page_text)
             if pages_text:
+                logger.info(f"Extracted {len(pages_text)} pages using PyPDF2 from {filename}")
                 return "\n\n".join(pages_text)
         except ImportError:
             logger.warning("Neither pdfplumber nor PyPDF2 available for PDF extraction")

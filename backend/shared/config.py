@@ -45,6 +45,12 @@ class Config:
     POSTMARK_API_KEY: str = os.getenv("POSTMARK_API_KEY", "")
     POSTMARK_INBOUND_URL: str = os.getenv("POSTMARK_INBOUND_URL", "")
 
+    # Domain 1: AWS Textract (optional document extraction)
+    USE_TEXTRACT: bool = os.getenv("USE_TEXTRACT", "false").lower() == "true"
+    AWS_REGION: str = os.getenv("AWS_REGION", "us-west-2")
+    AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY_ID", "")
+    AWS_SECRET_ACCESS_KEY: str = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+
     # Domain 2: AI Classification
     LLM_PROVIDER: LLMProvider = LLMProvider(os.getenv("LLM_PROVIDER", "cerebras"))
     CEREBRAS_API_KEY: str = os.getenv("CEREBRAS_API_KEY", "")

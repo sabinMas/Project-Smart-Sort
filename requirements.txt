@@ -51,6 +51,9 @@ python-dotenv==1.0.0
 pdfplumber==0.10.4
 PyPDF2==3.0.1
 
+# AWS Services (Domain 1 - Textract for PDF parsing)
+boto3>=1.28.0
+
 # Utilities
 requests==2.31.0
 click==8.1.7
