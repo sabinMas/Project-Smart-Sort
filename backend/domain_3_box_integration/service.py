@@ -1,6 +1,9 @@
 """Business logic for Domain 3: Box Integration."""
 
+import io
+import asyncio
 from datetime import datetime, timezone
+from typing import Optional
 from backend.shared.types import ClassificationResult, ProcessingResult
 from backend.shared.config import FOLDER_MAPPING, REVIEWER_MAPPING
 from backend.shared.errors import BoxIntegrationError
@@ -27,7 +30,12 @@ class BoxIntegrationService:
         self.task_manager = TaskManager(self.box_client)
         self.notification_manager = NotificationManager()
 
-    async def process(self, classification_result: ClassificationResult) -> ProcessingResult:
+    async def process(
+        self,
+        classification_result: ClassificationResult,
+        raw_file_bytes: Optional[bytes] = None,
+        filename: Optional[str] = None,
+    ) -> ProcessingResult:
         """Process a classification result through Box integration.
 
         End-to-end flow:
@@ -58,10 +66,19 @@ class BoxIntegrationService:
             folder_path = self._get_destination_path(doc_type)
             folder_id = await self.box_client.get_or_create_folder(folder_path)
 
-            # Step 2: Move file to destination
-            # In a real flow, the file_id comes from Domain 1's upload.
-            # For now we use the document_id as a reference to the Box file.
-            file_id = await self._move_to_destination_folder(document_id, doc_type)
+            # Step 2: Upload file to correct Box folder
+            # If we have raw bytes, upload them. Otherwise use document_id as reference.
+            if raw_file_bytes:
+                upload_filename = filename or f"{doc_type}_{document_id}.pdf"
+                file_id = await self.box_client.upload_file_bytes(
+                    file_bytes=raw_file_bytes,
+                    folder_id=folder_id,
+                    file_name=upload_filename,
+                )
+                logger.info(f"Uploaded file '{upload_filename}' to {folder_path}")
+            else:
+                # Fallback: try to move existing file (legacy path)
+                file_id = await self._move_to_destination_folder(document_id, doc_type)
 
             # Step 3: Apply metadata
             metadata = await self._apply_metadata(file_id, classification_result)

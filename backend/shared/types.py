@@ -34,6 +34,7 @@ class IngestedDocument:
     source: Literal["email", "box_file_request"] = "email"
     email_from: Optional[str] = None
     file_size_bytes: Optional[int] = None
+    raw_file_bytes: Optional[bytes] = None  # Raw file bytes for Box upload
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""

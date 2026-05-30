@@ -97,8 +97,12 @@ class DocumentOrchestrator:
             if classification.confidence >= CONFIDENCE_THRESHOLD:
                 logger.info(f"Step 3/3: Routing to Box (confidence >= {CONFIDENCE_THRESHOLD:.0%})...")
 
-                # Call Domain 3 to route to Box
-                processing_result = await self.box_integration.process(classification)
+                # Call Domain 3 to route to Box, passing raw bytes for actual upload
+                processing_result = await self.box_integration.process(
+                    classification,
+                    raw_file_bytes=document.raw_file_bytes,
+                    filename=document.filename,
+                )
                 logger.info(
                     f"  ✓ Routed to Box: {processing_result.destination_folder} "
                     f"(File ID: {processing_result.box_file_id})"

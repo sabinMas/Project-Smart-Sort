@@ -106,6 +106,43 @@ class BoxClient:
         except Exception as e:
             raise BoxUploadError(f"Failed to upload file '{file_name}': {e}")
 
+    async def upload_file_bytes(
+        self,
+        file_bytes: bytes,
+        folder_id: str,
+        file_name: str,
+    ) -> str:
+        """Upload raw bytes as a file to Box.
+
+        Args:
+            file_bytes: Raw file content as bytes
+            folder_id: Destination Box folder ID
+            file_name: Name for file in Box
+
+        Returns:
+            str: Box file ID of uploaded file
+        """
+        if self._demo_mode:
+            self._demo_file_counter += 1
+            file_id = f"file_{self._demo_file_counter}"
+            logger.info(f"[DEMO] Uploaded bytes '{file_name}' ({len(file_bytes)} bytes) to folder {folder_id} -> {file_id}")
+            return file_id
+
+        try:
+            uploaded_file = await asyncio.to_thread(
+                self.client.uploads.upload_file,
+                attributes={
+                    "name": file_name,
+                    "parent": {"id": folder_id},
+                },
+                file=io.BytesIO(file_bytes),
+            )
+            file_id = uploaded_file.entries[0].id
+            logger.info(f"Uploaded '{file_name}' ({len(file_bytes)} bytes) to folder {folder_id} -> {file_id}")
+            return file_id
+        except Exception as e:
+            raise BoxUploadError(f"Failed to upload file '{file_name}': {e}")
+
     async def move_file(
         self,
         file_id: str,

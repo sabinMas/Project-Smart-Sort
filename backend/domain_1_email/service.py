@@ -84,6 +84,7 @@ class EmailIngestionService:
             filename = subject or "email_document"
             content_type = "text/plain"
             file_size_bytes: Optional[int] = None
+            first_attachment_bytes: Optional[bytes] = None  # Raw bytes for Box upload
 
             if attachments and len(attachments) > 0:
                 for attachment in attachments:
@@ -118,6 +119,7 @@ class EmailIngestionService:
                         if att_content_type in SUPPORTED_CONTENT_TYPES:
                             content_type = att_content_type
                         file_size_bytes = len(raw_bytes)
+                        first_attachment_bytes = raw_bytes  # Keep raw bytes for Box upload
 
             # 4. Combine all content
             full_content = "\n".join(content_parts).strip()
@@ -133,6 +135,7 @@ class EmailIngestionService:
                 source="email",
                 email_from=from_email,
                 file_size_bytes=file_size_bytes,
+                raw_file_bytes=first_attachment_bytes,  # Raw bytes for actual Box upload
             )
 
             logger.info(
