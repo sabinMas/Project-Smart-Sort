@@ -16,6 +16,7 @@ sendgrid==6.11.0
 postmark==1.0.0
 pydantic==2.6.1
 pydantic-settings==2.1.0
+email-validator==2.3.0
 
 # Async & Database
 httpx==0.25.2
